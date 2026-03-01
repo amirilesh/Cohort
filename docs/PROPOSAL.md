@@ -197,4 +197,4 @@ A backend keeps API keys off the client and enables caching + consistent scoring
 
 - Amir Ileshev
 - Aydin Mammadzada
-- Kanat Danabay
+- Danabay Kanat
