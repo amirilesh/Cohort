@@ -1,3 +1,7 @@
 # macOS
+.idea
+build
+.gradle
+*.iml
 .DS_Store
 **/.DS_Store
