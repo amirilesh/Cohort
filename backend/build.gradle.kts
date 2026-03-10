@@ -16,6 +16,8 @@ kotlin {
 }
 
 dependencies {
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.call.logging)
     implementation(libs.ktor.server.content.negotiation)
