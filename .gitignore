@@ -1,3 +1,7 @@
 # macOS
+.idea/
+*.iml
+out/
+build/
 .DS_Store
 **/.DS_Store
