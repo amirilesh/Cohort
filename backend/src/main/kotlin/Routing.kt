@@ -16,5 +16,12 @@ fun Application.configureRouting() {
 
             call.respond(papers)
         }
+
+        get("/pdfinfo") {
+            val url = call.request.queryParameters["url"] ?: ""
+            val pdfInfo = PdfInfoService.fetchPdfInfo(url)
+
+            call.respond(pdfInfo)
+        }
     }
 }

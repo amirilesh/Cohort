@@ -41,12 +41,10 @@ object OpenAlexService {
                     abstractText = reconstructAbstract(work.abstractInvertedIndex),
                     isOpenAccess = work.openAccess?.isOpenAccess,
                     oaStatus = work.openAccess?.oaStatus,
-                    oaUrl = work.openAccess?.oaUrl
+                    oaUrl = work.bestOaLocation?.pdfUrl
                 )
             }
-            .filter { paper ->
-                paper.isOpenAccess == true && paper.oaUrl != null
-            }
+            .filter { it.isOpenAccess == true && it.oaUrl != null }
     }
 
     private fun reconstructAbstract(abstractInvertedIndex: Map<String, List<Int>>?): String? {
@@ -91,12 +89,18 @@ private data class OpenAlexWork(
     @SerialName("publication_year") val publicationYear: Int? = null,
     val doi: String? = null,
     @SerialName("abstract_inverted_index") val abstractInvertedIndex: Map<String, List<Int>>? = null,
-    @SerialName("open_access") val openAccess: OpenAccessInfo? = null
+    @SerialName("open_access") val openAccess: OpenAccessInfo? = null,
+    @SerialName("best_oa_location") val bestOaLocation: BestOaLocation? = null
 )
 
 @Serializable
 private data class OpenAccessInfo(
     @SerialName("is_oa") val isOpenAccess: Boolean? = null,
-    @SerialName("oa_status") val oaStatus: String? = null,
-    @SerialName("pdf_url") val oaUrl: String? = null
+    @SerialName("oa_status") val oaStatus: String? = null
+)
+
+@Serializable
+private data class BestOaLocation(
+    @SerialName("pdf_url") val pdfUrl: String? = null,
+    @SerialName("landing_page_url") val landingPageUrl: String? = null
 )
