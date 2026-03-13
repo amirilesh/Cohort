@@ -3,8 +3,12 @@ package com.cohort
 import kotlinx.serialization.Serializable
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
-import java.net.HttpURLConnection
+import java.net.CookieManager
 import java.net.URL
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 
 @Serializable
 data class PdfTextResponse(
@@ -20,8 +24,12 @@ data class PdfTextResponse(
 object PdfTextService {
     private const val MAX_RETURNED_TEXT_LENGTH = 5000
     private const val MAX_REDIRECTS = 5
+    private const val MAX_PDF_CANDIDATES = 5
     private const val USER_AGENT =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    private const val HTML_ACCEPT =
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    private const val PDF_ACCEPT = "application/pdf"
 
     fun extractText(url: String): PdfTextResponse {
         val downloadResult = downloadPdf(url)
@@ -64,61 +72,57 @@ object PdfTextService {
     }
 
     private fun downloadPdf(url: String): PdfDownloadResult {
-        var currentUrl = url
+        val client = HttpClient.newBuilder()
+            .cookieHandler(CookieManager())
+            .connectTimeout(Duration.ofSeconds(15))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
 
-        repeat(MAX_REDIRECTS + 1) {
-            var connection: HttpURLConnection? = null
+        val firstResponse = fetchWithRedirects(client, url, HTML_ACCEPT)
 
-            try {
-                connection = URL(currentUrl).openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 15_000
-                connection.instanceFollowRedirects = false
-                connection.setRequestProperty("User-Agent", USER_AGENT)
-                connection.setRequestProperty("Accept", "application/pdf")
+        if (firstResponse == null) {
+            return PdfDownloadResult(
+                contentType = null,
+                bytes = ByteArray(0),
+                isLikelyPdf = false,
+            )
+        }
 
-                val responseCode = connection.responseCode
-                val contentType = connection.contentType
+        if (isLikelyPdf(firstResponse.contentType, firstResponse.bytes)) {
+            return PdfDownloadResult(
+                contentType = firstResponse.contentType,
+                bytes = firstResponse.bytes,
+                isLikelyPdf = true,
+            )
+        }
 
-                if (isRedirect(responseCode)) {
-                    val location = connection.getHeaderField("Location")
+        if (!isHtml(firstResponse.contentType, firstResponse.bytes)) {
+            return PdfDownloadResult(
+                contentType = firstResponse.contentType,
+                bytes = firstResponse.bytes,
+                isLikelyPdf = false,
+            )
+        }
 
-                    if (!location.isNullOrBlank()) {
-                        currentUrl = URL(URL(currentUrl), location).toString()
-                        return@repeat
-                    }
-                }
+        val html = firstResponse.bytes.toString(Charsets.UTF_8)
+        val candidateUrls = findPdfCandidateUrls(firstResponse.finalUrl, html)
 
-                val stream = if (responseCode in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                }
+        for (candidateUrl in candidateUrls.take(MAX_PDF_CANDIDATES)) {
+            val candidateResponse = fetchWithRedirects(client, candidateUrl, PDF_ACCEPT) ?: continue
+            val candidateIsPdf = isLikelyPdf(candidateResponse.contentType, candidateResponse.bytes)
 
-                val bytes = stream?.use { inputStream ->
-                    inputStream.readBytes()
-                } ?: ByteArray(0)
-
+            if (candidateIsPdf) {
                 return PdfDownloadResult(
-                    contentType = contentType,
-                    bytes = bytes,
-                    isLikelyPdf = isLikelyPdf(contentType, bytes),
+                    contentType = candidateResponse.contentType,
+                    bytes = candidateResponse.bytes,
+                    isLikelyPdf = true,
                 )
-            } catch (_: Exception) {
-                return PdfDownloadResult(
-                    contentType = null,
-                    bytes = ByteArray(0),
-                    isLikelyPdf = false,
-                )
-            } finally {
-                connection?.disconnect()
             }
         }
 
         return PdfDownloadResult(
-            contentType = null,
-            bytes = ByteArray(0),
+            contentType = firstResponse.contentType,
+            bytes = firstResponse.bytes,
             isLikelyPdf = false,
         )
     }
@@ -133,26 +137,130 @@ object PdfTextService {
         val looksLikePdfByHeader = contentType?.lowercase()?.contains("pdf") == true
         val looksLikePdfBySignature =
             bytes.size >= 5 &&
-                    bytes[0] == '%'.code.toByte() &&
-                    bytes[1] == 'P'.code.toByte() &&
-                    bytes[2] == 'D'.code.toByte() &&
-                    bytes[3] == 'F'.code.toByte() &&
-                    bytes[4] == '-'.code.toByte()
+                bytes[0] == '%'.code.toByte() &&
+                bytes[1] == 'P'.code.toByte() &&
+                bytes[2] == 'D'.code.toByte() &&
+                bytes[3] == 'F'.code.toByte() &&
+                bytes[4] == '-'.code.toByte()
 
         return looksLikePdfByHeader || looksLikePdfBySignature
     }
 
-    private fun isRedirect(responseCode: Int): Boolean {
-        return responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-                responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-                responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-                responseCode == 307 ||
-                responseCode == 308
+    private fun isHtml(contentType: String?, bytes: ByteArray): Boolean {
+        val looksLikeHtmlByHeader = contentType?.lowercase()?.contains("text/html") == true
+        val bodyStart = bytes
+            .take(200)
+            .toByteArray()
+            .toString(Charsets.UTF_8)
+            .trimStart()
+            .lowercase()
+
+        val looksLikeHtmlByBody =
+            bodyStart.startsWith("<!doctype html") || bodyStart.startsWith("<html")
+
+        return looksLikeHtmlByHeader || looksLikeHtmlByBody
+    }
+
+    private fun fetchWithRedirects(
+        client: HttpClient,
+        url: String,
+        acceptHeader: String,
+    ): HttpFetchResult? {
+        var currentUrl = url
+
+        repeat(MAX_REDIRECTS + 1) {
+            try {
+                val request = HttpRequest.newBuilder()
+                    .uri(URL(currentUrl).toURI())
+                    .timeout(Duration.ofSeconds(20))
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", acceptHeader)
+                    .GET()
+                    .build()
+
+                val response = client.send(request, HttpResponse.BodyHandlers.ofByteArray())
+                val contentType = response.headers().firstValue("Content-Type").orElse(null)
+
+                if (isRedirect(response.statusCode())) {
+                    val location = response.headers().firstValue("Location").orElse(null)
+
+                    if (!location.isNullOrBlank()) {
+                        currentUrl = URL(URL(currentUrl), location).toString()
+                        return@repeat
+                    }
+                }
+
+                return HttpFetchResult(
+                    finalUrl = currentUrl,
+                    contentType = contentType,
+                    bytes = response.body(),
+                )
+            } catch (_: Exception) {
+                return null
+            }
+        }
+
+        return null
+    }
+
+    private fun findPdfCandidateUrls(baseUrl: String, html: String): List<String> {
+        val matches = linkedSetOf<String>()
+
+        val metaRegex = Regex(
+            """<meta[^>]+name=["']citation_pdf_url["'][^>]+content=["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        val hrefRegex = Regex(
+            """href=["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+
+        metaRegex.findAll(html).forEach { match ->
+            matches += resolveUrl(baseUrl, match.groupValues[1])
+        }
+
+        hrefRegex.findAll(html).forEach { match ->
+            val candidate = match.groupValues[1]
+            val normalized = candidate.lowercase()
+
+            if (
+                normalized.contains(".pdf") ||
+                normalized.contains("/pdf") ||
+                normalized.contains("pdf=") ||
+                normalized.contains("downloadpdf")
+            ) {
+                matches += resolveUrl(baseUrl, candidate)
+            }
+        }
+
+        return matches.filter { it.isNotBlank() }
+    }
+
+    private fun resolveUrl(baseUrl: String, value: String): String {
+        return try {
+            URL(URL(baseUrl), value).toString()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    private fun isRedirect(statusCode: Int): Boolean {
+        return statusCode == 301 ||
+            statusCode == 302 ||
+            statusCode == 303 ||
+            statusCode == 307 ||
+            statusCode == 308
     }
 
     private data class PdfDownloadResult(
         val contentType: String?,
         val bytes: ByteArray,
         val isLikelyPdf: Boolean,
+    )
+
+    private data class HttpFetchResult(
+        val finalUrl: String,
+        val contentType: String?,
+        val bytes: ByteArray,
     )
 }
