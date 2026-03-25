@@ -78,7 +78,12 @@ object PdfTextService {
             .followRedirects(HttpClient.Redirect.NEVER)
             .build()
 
-        val firstResponse = fetchWithRedirects(client, url, HTML_ACCEPT)
+        val firstResponse = fetchWithRedirects(
+            client = client,
+            url = url,
+            acceptHeader = HTML_ACCEPT,
+            referer = null,
+        )
 
         if (firstResponse == null) {
             return PdfDownloadResult(
@@ -108,7 +113,12 @@ object PdfTextService {
         val candidateUrls = findPdfCandidateUrls(firstResponse.finalUrl, html)
 
         for (candidateUrl in candidateUrls.take(MAX_PDF_CANDIDATES)) {
-            val candidateResponse = fetchWithRedirects(client, candidateUrl, PDF_ACCEPT) ?: continue
+            val candidateResponse = fetchWithRedirects(
+                client = client,
+                url = candidateUrl,
+                acceptHeader = PDF_ACCEPT,
+                referer = firstResponse.finalUrl,
+            ) ?: continue
             val candidateIsPdf = isLikelyPdf(candidateResponse.contentType, candidateResponse.bytes)
 
             if (candidateIsPdf) {
@@ -165,16 +175,24 @@ object PdfTextService {
         client: HttpClient,
         url: String,
         acceptHeader: String,
+        referer: String?,
     ): HttpFetchResult? {
         var currentUrl = url
+        var currentReferer = referer
 
         repeat(MAX_REDIRECTS + 1) {
             try {
-                val request = HttpRequest.newBuilder()
+                val requestBuilder = HttpRequest.newBuilder()
                     .uri(URL(currentUrl).toURI())
                     .timeout(Duration.ofSeconds(20))
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", acceptHeader)
+
+                if (!currentReferer.isNullOrBlank()) {
+                    requestBuilder.header("Referer", currentReferer)
+                }
+
+                val request = requestBuilder
                     .GET()
                     .build()
 
@@ -185,7 +203,9 @@ object PdfTextService {
                     val location = response.headers().firstValue("Location").orElse(null)
 
                     if (!location.isNullOrBlank()) {
+                        val previousUrl = currentUrl
                         currentUrl = URL(URL(currentUrl), location).toString()
+                        currentReferer = previousUrl
                         return@repeat
                     }
                 }
@@ -214,12 +234,30 @@ object PdfTextService {
             """href=["']([^"']+)["']""",
             RegexOption.IGNORE_CASE,
         )
+        val srcRegex = Regex(
+            """src=["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
 
         metaRegex.findAll(html).forEach { match ->
             matches += resolveUrl(baseUrl, match.groupValues[1])
         }
 
         hrefRegex.findAll(html).forEach { match ->
+            val candidate = match.groupValues[1]
+            val normalized = candidate.lowercase()
+
+            if (
+                normalized.contains(".pdf") ||
+                normalized.contains("/pdf") ||
+                normalized.contains("pdf=") ||
+                normalized.contains("downloadpdf")
+            ) {
+                matches += resolveUrl(baseUrl, candidate)
+            }
+        }
+
+        srcRegex.findAll(html).forEach { match ->
             val candidate = match.groupValues[1]
             val normalized = candidate.lowercase()
 
