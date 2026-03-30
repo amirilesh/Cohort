@@ -38,5 +38,23 @@ fun Application.configureRouting() {
             val result = PdfTextService.extractText(url)
             call.respond(result)
         }
+
+        get("/studycard") {
+            val url = call.request.queryParameters["url"]
+
+            if (url.isNullOrBlank()) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    StudyCardResponse(
+                        url = "",
+                        success = false,
+                    )
+                )
+                return@get
+            }
+
+            val result = StudyCardService.generate(url)
+            call.respond(result)
+        }
     }
 }
