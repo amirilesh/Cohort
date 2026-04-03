@@ -56,8 +56,6 @@ object StudyCardService {
             success = false,
         )
 
-        println("API KEY PRESENT: " + apiKey.take(10) + "...")
-
         val model = System.getenv("OPENAI_MODEL") ?: DEFAULT_MODEL
         val requestBody = buildRequestBody(model, extractedText.take(MAX_INPUT_TEXT_LENGTH))
 
@@ -75,9 +73,6 @@ object StudyCardService {
                 .build()
 
             val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-
-            println("STATUS: " + response.statusCode())
-            println("BODY: " + response.body())
 
             if (response.statusCode() !in 200..299) {
                 return StudyCardResponse(
