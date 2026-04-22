@@ -25,6 +25,7 @@ data class StudyCardResponse(
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
+    val reason: String? = null,
 )
 
 object StudyCardService {
@@ -44,15 +45,42 @@ object StudyCardService {
             return StudyCardResponse(
                 url = url,
                 success = false,
+                reason = pdfText.reason ?: "pdf_download_failed",
             )
         }
 
-        return generateFromExtractedText(url, pdfText.extractedText)
-            ?: generateFallbackStudyCard(url, pdfText.extractedText)
+        val llmResult = generateFromExtractedText(url, pdfText.extractedText)
+
+        // llmResult is null only when no API key is set — fall back silently
+        // llmResult.success == false means the LLM call failed — still fall back but preserve reason
+        if (llmResult != null && !llmResult.success) {
+            return generateFallbackStudyCard(url, pdfText.extractedText)
+        }
+
+        return llmResult ?: generateFallbackStudyCard(url, pdfText.extractedText)
+    }
+
+    fun generateFromDoi(doi: String): StudyCardResponse {
+        val pdfUrl = OpenAlexService.getOaUrlForDoi(doi)
+
+        if (pdfUrl != null) {
+            return generate(pdfUrl)
+        }
+
+        return StudyCardResponse(
+            url = "",
+            success = false,
+            reason = if (OpenAlexService.hasWorkForDoi(doi)) {
+                "no_open_access_pdf"
+            } else {
+                "openalex_not_found"
+            },
+        )
     }
 
     private fun generateFromExtractedText(url: String, extractedText: String): StudyCardResponse? {
-        val apiKey = System.getenv("OPENAI_API_KEY") ?: return null
+        val apiKey = System.getenv("OPENAI_API_KEY")
+        if (apiKey.isNullOrBlank()) return null
 
         val model = System.getenv("OPENAI_MODEL") ?: DEFAULT_MODEL
         val requestBody = buildRequestBody(model, extractedText.take(MAX_INPUT_TEXT_LENGTH))
@@ -73,12 +101,13 @@ object StudyCardService {
             val response = client.send(request, HttpResponse.BodyHandlers.ofString())
 
             if (response.statusCode() !in 200..299) {
-                return null
+                return StudyCardResponse(url = url, success = false, reason = "llm_generation_failed")
             }
 
             parseStudyCard(url, response.body())
+                ?: StudyCardResponse(url = url, success = false, reason = "llm_generation_failed")
         } catch (_: Exception) {
-            null
+            StudyCardResponse(url = url, success = false, reason = "llm_generation_failed")
         }
     }
 
@@ -107,7 +136,7 @@ object StudyCardService {
                     role = "user",
                     content =
                         "Create a study card from the paper text below.\n\n" +
-                            extractedText,
+                                extractedText,
                 ),
             ),
         )
