@@ -10,6 +10,23 @@ object Database {
 
     fun connect(): Connection = DriverManager.getConnection(url, user, password)
 
+    fun initSchema() {
+        val sql = Database::class.java.getResourceAsStream("/schema.sql")
+            ?.bufferedReader()
+            ?.readText()
+            ?: error("schema.sql not found in resources")
+
+        connect().use { conn ->
+            sql.split(";")
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .forEach { statement ->
+                    conn.createStatement().execute(statement)
+                }
+        }
+        println("[Database] schema initialized")
+    }
+
     fun checkConnection(): String {
         return try {
             connect().use { "up" }
