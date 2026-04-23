@@ -121,6 +121,14 @@ fun Application.configureRouting() {
             call.respond(result)
         }
 
+        get("/studycards/recent") {
+            call.respond(HistoryQueries.getRecentStudyCards())
+        }
+
+        get("/search/history") {
+            call.respond(HistoryQueries.getSearchHistory())
+        }
+
         get("/health") {
             val openAlexStatus = checkOpenAlex()
             val openAiKeyStatus = if (System.getenv("OPENAI_API_KEY").isNullOrBlank()) "missing" else "present"
