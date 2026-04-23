@@ -2,9 +2,11 @@ package com.cohort
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import org.slf4j.LoggerFactory
 import java.sql.Connection
 
 object Database {
+    private val log = LoggerFactory.getLogger(Database::class.java)
     private val dataSource = HikariDataSource(
         HikariConfig().apply {
             jdbcUrl         = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/cohort"
@@ -30,7 +32,7 @@ object Database {
                     conn.createStatement().execute(statement)
                 }
         }
-        println("[Database] schema initialized")
+        log.info("schema initialized")
     }
 
     fun checkConnection(): String {

@@ -3,6 +3,7 @@ package com.cohort
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -20,6 +21,7 @@ data class SearchResult(
 )
 
 object OpenAlexService {
+    private val log = LoggerFactory.getLogger(OpenAlexService::class.java)
 
     private const val MAX_PER_PAGE = 25
 
@@ -126,7 +128,7 @@ object OpenAlexService {
             ?.lowercase()
 
         if (returnedDoi != normalizedDoi) {
-            println("[OpenAlexService] DOI mismatch: requested=$normalizedDoi returned=$returnedDoi")
+            log.warn("DOI mismatch: requested={} returned={}", normalizedDoi, returnedDoi)
             return null
         }
 

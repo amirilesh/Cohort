@@ -3,10 +3,12 @@ package com.cohort
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.postgresql.util.PGobject
+import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.util.UUID
 
 object StudyCardPersistence {
+    private val log = LoggerFactory.getLogger(StudyCardPersistence::class.java)
 
     fun save(card: StudyCardResponse, doi: String?) {
         try {
@@ -15,7 +17,7 @@ object StudyCardPersistence {
                 insertStudyCard(conn, card, paperId)
             }
         } catch (e: Exception) {
-            println("[StudyCardPersistence] failed to save study card: ${e.message}")
+            log.error("failed to save study card", e)
         }
     }
 

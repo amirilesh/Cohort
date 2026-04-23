@@ -1,10 +1,12 @@
 package com.cohort
 
+import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.sql.Types
 import java.util.UUID
 
 object SearchPersistence {
+    private val log = LoggerFactory.getLogger(SearchPersistence::class.java)
 
     fun save(result: SearchResult) {
         try {
@@ -23,7 +25,7 @@ object SearchPersistence {
                 }
             }
         } catch (e: Exception) {
-            println("[SearchPersistence] failed to save search: ${e.message}")
+            log.error("failed to save search", e)
         }
     }
 
