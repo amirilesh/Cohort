@@ -99,6 +99,7 @@ fun Application.configureRouting() {
 
             if (!doi.isNullOrBlank()) {
                 val result = StudyCardService.generateFromDoi(doi)
+                if (result.success) StudyCardPersistence.save(result, doi)
                 call.respond(result)
                 return@get
             }
@@ -116,6 +117,7 @@ fun Application.configureRouting() {
             }
 
             val result = StudyCardService.generate(url)
+            if (result.success) StudyCardPersistence.save(result, doi = null)
             call.respond(result)
         }
 

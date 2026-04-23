@@ -69,6 +69,19 @@ object OpenAlexService {
         return getWorkByDoi(doi) != null
     }
 
+    fun getPaperByDoi(doi: String): PaperPreview? {
+        val work = getWorkByDoi(doi) ?: return null
+        return PaperPreview(
+            title = work.title,
+            year = work.publicationYear,
+            doi = work.doi,
+            abstractText = reconstructAbstract(work.abstractInvertedIndex),
+            isOpenAccess = work.openAccess?.isOpenAccess,
+            oaStatus = work.openAccess?.oaStatus,
+            oaUrl = work.bestOaLocation?.pdfUrl,
+        )
+    }
+
     private fun reconstructAbstract(abstractInvertedIndex: Map<String, List<Int>>?): String? {
         if (abstractInvertedIndex.isNullOrEmpty()) return null
 

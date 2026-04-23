@@ -45,7 +45,7 @@ object SearchPersistence {
         }
     }
 
-    private fun upsertPaper(conn: Connection, paper: PaperPreview): UUID {
+    internal fun upsertPaper(conn: Connection, paper: PaperPreview): UUID {
         val sql = """
             INSERT INTO papers (doi, title, publication_year, abstract, oa_url, oa_status)
             VALUES (?, ?, ?, ?, ?, ?)
