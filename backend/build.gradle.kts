@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.ktor.server.config.yaml)
     implementation(libs.apache.pdfbox)
     implementation(libs.postgresql)
+    implementation(libs.hikaricp)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }

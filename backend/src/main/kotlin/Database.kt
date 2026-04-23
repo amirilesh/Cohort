@@ -1,14 +1,20 @@
 package com.cohort
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
-import java.sql.DriverManager
 
 object Database {
-    private val url      = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/cohort"
-    private val user     = System.getenv("DB_USER")     ?: "cohort"
-    private val password = System.getenv("DB_PASSWORD") ?: "cohort"
+    private val dataSource = HikariDataSource(
+        HikariConfig().apply {
+            jdbcUrl         = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/cohort"
+            username        = System.getenv("DB_USER")     ?: "cohort"
+            password        = System.getenv("DB_PASSWORD") ?: "cohort"
+            maximumPoolSize = 10
+        }
+    )
 
-    fun connect(): Connection = DriverManager.getConnection(url, user, password)
+    fun connect(): Connection = dataSource.connection
 
     fun initSchema() {
         val sql = Database::class.java.getResourceAsStream("/schema.sql")

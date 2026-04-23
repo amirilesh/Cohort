@@ -4,6 +4,7 @@ ktor = "3.4.0"
 logback = "1.4.14"
 pdfbox = "2.0.33"
 postgres = "42.7.3"
+hikari = "5.1.0"
 
 [libraries]
 ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
@@ -18,6 +19,7 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref 
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 apache-pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgres" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
