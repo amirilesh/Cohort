@@ -2,6 +2,7 @@ package com.cohort
 
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -33,43 +34,45 @@ fun Application.configureRouting() {
             call.respondText("Hello World!")
         }
 
-        get("/search") {
-            val query = call.request.queryParameters["q"]
-            if (query.isNullOrBlank()) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    SearchErrorResponse(reason = "missing_query"),
-                )
-                return@get
-            }
+        rateLimit(SearchRateLimit) {
+            get("/search") {
+                val query = call.request.queryParameters["q"]
+                if (query.isNullOrBlank()) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        SearchErrorResponse(reason = "missing_query"),
+                    )
+                    return@get
+                }
 
-            val pageParam = call.request.queryParameters["page"]
-            val page = pageParam?.toIntOrNull()
-            if (pageParam != null && (page == null || page < 1)) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    SearchErrorResponse(reason = "invalid_page"),
-                )
-                return@get
-            }
+                val pageParam = call.request.queryParameters["page"]
+                val page = pageParam?.toIntOrNull()
+                if (pageParam != null && (page == null || page < 1)) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        SearchErrorResponse(reason = "invalid_page"),
+                    )
+                    return@get
+                }
 
-            val perPageParam = call.request.queryParameters["perPage"]
-            val perPage = perPageParam?.toIntOrNull()
-            if (perPageParam != null && (perPage == null || perPage <= 0)) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    SearchErrorResponse(reason = "invalid_per_page"),
-                )
-                return@get
-            }
+                val perPageParam = call.request.queryParameters["perPage"]
+                val perPage = perPageParam?.toIntOrNull()
+                if (perPageParam != null && (perPage == null || perPage <= 0)) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        SearchErrorResponse(reason = "invalid_per_page"),
+                    )
+                    return@get
+                }
 
-            val result = OpenAlexService.searchWorks(
-                query = query,
-                page = page ?: 1,
-                perPage = perPage ?: 10,
-            )
-            SearchPersistence.save(result)
-            call.respond(result)
+                val result = OpenAlexService.searchWorks(
+                    query = query,
+                    page = page ?: 1,
+                    perPage = perPage ?: 10,
+                )
+                SearchPersistence.save(result)
+                call.respond(result)
+            }
         }
 
         get("/pdftext") {
@@ -93,32 +96,34 @@ fun Application.configureRouting() {
             call.respond(result)
         }
 
-        get("/studycard") {
-            val doi = call.request.queryParameters["doi"]
-            val url = call.request.queryParameters["url"]
+        rateLimit(StudyCardRateLimit) {
+            get("/studycard") {
+                val doi = call.request.queryParameters["doi"]
+                val url = call.request.queryParameters["url"]
 
-            if (!doi.isNullOrBlank()) {
-                val result = StudyCardService.generateFromDoi(doi)
-                if (result.success) StudyCardPersistence.save(result, doi)
-                call.respond(result)
-                return@get
-            }
+                if (!doi.isNullOrBlank()) {
+                    val result = StudyCardService.generateFromDoi(doi)
+                    if (result.success) StudyCardPersistence.save(result, doi)
+                    call.respond(result)
+                    return@get
+                }
 
-            if (url.isNullOrBlank()) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    StudyCardResponse(
-                        url = "",
-                        success = false,
-                        reason = "missing_doi_or_url",
+                if (url.isNullOrBlank()) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        StudyCardResponse(
+                            url = "",
+                            success = false,
+                            reason = "missing_doi_or_url",
+                        )
                     )
-                )
-                return@get
-            }
+                    return@get
+                }
 
-            val result = StudyCardService.generate(url)
-            if (result.success) StudyCardPersistence.save(result, doi = null)
-            call.respond(result)
+                val result = StudyCardService.generate(url)
+                if (result.success) StudyCardPersistence.save(result, doi = null)
+                call.respond(result)
+            }
         }
 
         get("/studycards/recent") {

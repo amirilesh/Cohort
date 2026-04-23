@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.apache.pdfbox)
     implementation(libs.postgresql)
     implementation(libs.hikaricp)
+    implementation(libs.ktor.server.rate.limit)
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }

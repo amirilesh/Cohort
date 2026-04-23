@@ -11,5 +11,6 @@ fun Application.module() {
     configureHTTP()
     configureMonitoring()
     configureSerialization()
+    configureRateLimit()
     configureRouting()
 }
