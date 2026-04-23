@@ -68,6 +68,7 @@ fun Application.configureRouting() {
                 page = page ?: 1,
                 perPage = perPage ?: 10,
             )
+            SearchPersistence.save(result)
             call.respond(result)
         }
 
