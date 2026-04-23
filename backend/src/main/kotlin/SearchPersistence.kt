@@ -1,5 +1,7 @@
 package com.cohort
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.sql.Connection
 import java.sql.Types
@@ -8,7 +10,7 @@ import java.util.UUID
 object SearchPersistence {
     private val log = LoggerFactory.getLogger(SearchPersistence::class.java)
 
-    fun save(result: SearchResult) {
+    suspend fun save(result: SearchResult) = withContext(Dispatchers.IO) {
         try {
             Database.connect().use { conn ->
                 conn.autoCommit = false

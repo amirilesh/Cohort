@@ -1,5 +1,7 @@
 package com.cohort
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -24,7 +26,7 @@ data class SearchHistoryEntry(
 
 object HistoryQueries {
 
-    fun getRecentStudyCards(): List<RecentStudyCard> {
+    suspend fun getRecentStudyCards(): List<RecentStudyCard> = withContext(Dispatchers.IO) {
         val sql = """
             SELECT
                 sc.created_at,
@@ -55,12 +57,12 @@ object HistoryQueries {
                         title = rs.getString("title"),
                     )
                 }
-                return results
+                results
             }
         }
     }
 
-    fun getSearchHistory(): List<SearchHistoryEntry> {
+    suspend fun getSearchHistory(): List<SearchHistoryEntry> = withContext(Dispatchers.IO) {
         val sql = """
             SELECT query_text, page, per_page, total_count, executed_at
             FROM search_queries
@@ -81,7 +83,7 @@ object HistoryQueries {
                         executedAt = rs.getTimestamp("executed_at").toInstant().toString(),
                     )
                 }
-                return results
+                results
             }
         }
     }

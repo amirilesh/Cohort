@@ -1,5 +1,7 @@
 package com.cohort
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,7 +20,7 @@ data class PopularPaper(
 
 object AnalyticsQueries {
 
-    fun getTopSearches(): List<TopSearch> {
+    suspend fun getTopSearches(): List<TopSearch> = withContext(Dispatchers.IO) {
         val sql = """
             SELECT query_text, COUNT(*) AS times_used
             FROM search_queries
@@ -37,12 +39,12 @@ object AnalyticsQueries {
                         timesUsed = rs.getInt("times_used"),
                     )
                 }
-                return results
+                results
             }
         }
     }
 
-    fun getPopularPapers(): List<PopularPaper> {
+    suspend fun getPopularPapers(): List<PopularPaper> = withContext(Dispatchers.IO) {
         val sql = """
             SELECT p.title, p.doi, p.publication_year, COUNT(*) AS times_returned
             FROM search_results sr
@@ -64,7 +66,7 @@ object AnalyticsQueries {
                         timesReturned = rs.getInt("times_returned"),
                     )
                 }
-                return results
+                results
             }
         }
     }

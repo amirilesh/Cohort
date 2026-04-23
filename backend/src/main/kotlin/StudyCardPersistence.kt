@@ -1,5 +1,7 @@
 package com.cohort
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.postgresql.util.PGobject
@@ -10,7 +12,7 @@ import java.util.UUID
 object StudyCardPersistence {
     private val log = LoggerFactory.getLogger(StudyCardPersistence::class.java)
 
-    fun save(card: StudyCardResponse, doi: String?) {
+    suspend fun save(card: StudyCardResponse, doi: String?) = withContext(Dispatchers.IO) {
         try {
             Database.connect().use { conn ->
                 val paperId = if (doi != null) ensurePaperByDoi(conn, doi) else null
@@ -37,7 +39,6 @@ object StudyCardPersistence {
             if (rs.next()) return rs.getObject("id", UUID::class.java)
         }
 
-        // Paper not in DB yet — fetch from OpenAlex and upsert
         val paper = OpenAlexService.getPaperByDoi(doi) ?: return null
         return SearchPersistence.upsertPaper(conn, paper)
     }
