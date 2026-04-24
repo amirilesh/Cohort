@@ -3,6 +3,7 @@ package com.cohort
 import kotlinx.serialization.Serializable
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.text.PDFTextStripper
+import org.slf4j.LoggerFactory
 import java.net.CookieManager
 import java.net.URL
 import java.net.http.HttpClient
@@ -23,6 +24,8 @@ data class PdfTextResponse(
 )
 
 object PdfTextService {
+    private val log = LoggerFactory.getLogger(PdfTextService::class.java)
+
     private const val MAX_RETURNED_TEXT_LENGTH = 5000
     private const val MAX_REDIRECTS = 8
     private const val MAX_PDF_CANDIDATES = 5
@@ -77,7 +80,7 @@ object PdfTextService {
 
     private fun downloadPdf(url: String): PdfDownloadResult {
         val host = try { URL(url).host } catch (_: Exception) { url }
-        println("[PdfTextService] host=$host url=$url")
+        log.info("host={} url={}", host, url)
 
         val client = HttpClient.newBuilder()
             .cookieHandler(CookieManager())
@@ -93,12 +96,12 @@ object PdfTextService {
         )
 
         if (firstResponse == null) {
-            println("[PdfTextService] host=$host result=FAILED reason=request_failed")
+            log.warn("host={} result=FAILED reason=request_failed", host)
             return PdfDownloadResult(contentType = null, bytes = ByteArray(0), isLikelyPdf = false, reason = "pdf_download_failed")
         }
 
         if (isLikelyPdf(firstResponse.contentType, firstResponse.bytes)) {
-            println("[PdfTextService] host=$host result=PDF_FOUND via=direct")
+            log.info("host={} result=PDF_FOUND via=direct", host)
             return PdfDownloadResult(
                 contentType = firstResponse.contentType,
                 bytes = firstResponse.bytes,
@@ -107,7 +110,7 @@ object PdfTextService {
         }
 
         if (!isHtml(firstResponse.contentType, firstResponse.bytes)) {
-            println("[PdfTextService] host=$host result=FAILED reason=not_html_not_pdf")
+            log.warn("host={} result=FAILED reason=not_html_not_pdf", host)
             return PdfDownloadResult(
                 contentType = firstResponse.contentType,
                 bytes = firstResponse.bytes,
@@ -122,7 +125,7 @@ object PdfTextService {
         if (candidateUrls.isEmpty()) {
             // No candidates from HTML — try simple URL transformations
             val urlVariants = buildUrlVariants(firstResponse.finalUrl)
-            println("[PdfTextService] host=$host no_html_candidates trying ${urlVariants.size} url_variants")
+            log.info("host={} no_html_candidates trying {} url_variants", host, urlVariants.size)
 
             for (variant in urlVariants) {
                 val variantResponse = fetchWithRedirects(
@@ -133,7 +136,7 @@ object PdfTextService {
                 ) ?: continue
 
                 if (isLikelyPdf(variantResponse.contentType, variantResponse.bytes)) {
-                    println("[PdfTextService] host=$host result=PDF_FOUND via=url_variant variant=$variant")
+                    log.info("host={} result=PDF_FOUND via=url_variant variant={}", host, variant)
                     return PdfDownloadResult(
                         contentType = variantResponse.contentType,
                         bytes = variantResponse.bytes,
@@ -142,7 +145,7 @@ object PdfTextService {
                 }
             }
 
-            println("[PdfTextService] host=$host result=FAILED reason=no_pdf_candidate_found")
+            log.warn("host={} result=FAILED reason=no_pdf_candidate_found", host)
             return PdfDownloadResult(
                 contentType = firstResponse.contentType,
                 bytes = firstResponse.bytes,
@@ -151,7 +154,7 @@ object PdfTextService {
             )
         }
 
-        println("[PdfTextService] host=$host html_candidates=${candidateUrls.size}")
+        log.info("host={} html_candidates={}", host, candidateUrls.size)
 
         for (candidateUrl in candidateUrls.take(MAX_PDF_CANDIDATES)) {
             val candidateResponse = fetchWithRedirects(
@@ -162,7 +165,7 @@ object PdfTextService {
             ) ?: continue
 
             if (isLikelyPdf(candidateResponse.contentType, candidateResponse.bytes)) {
-                println("[PdfTextService] host=$host result=PDF_FOUND via=html_candidate candidate=$candidateUrl")
+                log.info("host={} result=PDF_FOUND via=html_candidate candidate={}", host, candidateUrl)
                 return PdfDownloadResult(
                     contentType = candidateResponse.contentType,
                     bytes = candidateResponse.bytes,
@@ -171,7 +174,7 @@ object PdfTextService {
             }
         }
 
-        println("[PdfTextService] host=$host result=FAILED reason=html_only_no_valid_pdf")
+        log.warn("host={} result=FAILED reason=html_only_no_valid_pdf", host)
         return PdfDownloadResult(
             contentType = firstResponse.contentType,
             bytes = firstResponse.bytes,

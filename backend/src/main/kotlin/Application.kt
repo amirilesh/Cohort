@@ -7,8 +7,10 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
+    Database.initSchema()
     configureHTTP()
     configureMonitoring()
     configureSerialization()
+    configureRateLimit()
     configureRouting()
 }
