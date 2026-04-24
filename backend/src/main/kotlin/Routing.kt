@@ -102,6 +102,11 @@ fun Application.configureRouting() {
                 val url = call.request.queryParameters["url"]
 
                 if (!doi.isNullOrBlank()) {
+                    val cached = StudyCardPersistence.findByDoi(doi)
+                    if (cached != null) {
+                        call.respond(cached)
+                        return@get
+                    }
                     val result = StudyCardService.generateFromDoi(doi)
                     if (result.success) StudyCardPersistence.save(result, doi)
                     call.respond(result)
@@ -120,6 +125,11 @@ fun Application.configureRouting() {
                     return@get
                 }
 
+                val cached = StudyCardPersistence.findByUrl(url)
+                if (cached != null) {
+                    call.respond(cached)
+                    return@get
+                }
                 val result = StudyCardService.generate(url)
                 if (result.success) StudyCardPersistence.save(result, doi = null)
                 call.respond(result)

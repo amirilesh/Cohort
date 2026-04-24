@@ -84,6 +84,28 @@ object OpenAlexService {
         )
     }
 
+    // Returns null when the DOI is not found on OpenAlex at all.
+    // Returns an empty list when found but no PDF/landing-page URLs are available.
+    // Priority: direct PDF URLs first (best → primary → rest), then landing pages as fallback.
+    fun getPdfCandidatesForDoi(doi: String): List<String>? {
+        val work = getWorkByDoi(doi) ?: return null
+        val seen = linkedSetOf<String>()
+
+        fun add(url: String?) { if (!url.isNullOrBlank()) seen += url }
+
+        // Direct PDF URLs — preferred, tried first
+        add(work.bestOaLocation?.pdfUrl)
+        add(work.primaryLocation?.pdfUrl)
+        work.locations.forEach { add(it.pdfUrl) }
+
+        // Landing pages — PdfTextService can discover PDFs from their HTML
+        add(work.bestOaLocation?.landingPageUrl)
+        add(work.primaryLocation?.landingPageUrl)
+        work.locations.forEach { add(it.landingPageUrl) }
+
+        return seen.toList()
+    }
+
     private fun reconstructAbstract(abstractInvertedIndex: Map<String, List<Int>>?): String? {
         if (abstractInvertedIndex.isNullOrEmpty()) return null
 
@@ -165,7 +187,9 @@ private data class OpenAlexWork(
     val doi: String? = null,
     @SerialName("abstract_inverted_index") val abstractInvertedIndex: Map<String, List<Int>>? = null,
     @SerialName("open_access") val openAccess: OpenAccessInfo? = null,
-    @SerialName("best_oa_location") val bestOaLocation: BestOaLocation? = null
+    @SerialName("best_oa_location") val bestOaLocation: OaLocation? = null,
+    @SerialName("primary_location") val primaryLocation: OaLocation? = null,
+    @SerialName("locations") val locations: List<OaLocation> = emptyList(),
 )
 
 @Serializable
@@ -175,7 +199,7 @@ private data class OpenAccessInfo(
 )
 
 @Serializable
-private data class BestOaLocation(
+private data class OaLocation(
     @SerialName("pdf_url") val pdfUrl: String? = null,
-    @SerialName("landing_page_url") val landingPageUrl: String? = null
+    @SerialName("landing_page_url") val landingPageUrl: String? = null,
 )
