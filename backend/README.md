@@ -1,43 +1,141 @@
-# backend
+# Cohort — Backend
 
-This project was created using the [Ktor Project Generator](https://start.ktor.io).
+Ktor (Kotlin) backend that searches scientific papers via OpenAlex, extracts PDF text, and generates study cards using an LLM. Results are persisted to PostgreSQL.
 
-Here are some useful links to get you started:
+---
 
-- [Ktor Documentation](https://ktor.io/docs/home.html)
-- [Ktor GitHub page](https://github.com/ktorio/ktor)
-- The [Ktor Slack chat](https://app.slack.com/client/T09229ZC6/C0A974TJ9). You'll need to [request an invite](https://surveys.jetbrains.com/s3/kotlin-slack-sign-up) to join.
+## Local setup
 
-## Features
+### 1. Start PostgreSQL with Docker
 
-Here's a list of features included in this project:
-
-| Name                                                                   | Description                                                                        |
-| ------------------------------------------------------------------------|------------------------------------------------------------------------------------ |
-| [CORS](https://start.ktor.io/p/cors)                                   | Enables Cross-Origin Resource Sharing (CORS)                                       |
-| [Call Logging](https://start.ktor.io/p/call-logging)                   | Logs client requests                                                               |
-| [Content Negotiation](https://start.ktor.io/p/content-negotiation)     | Provides automatic content conversion according to Content-Type and Accept headers |
-| [Routing](https://start.ktor.io/p/routing)                             | Provides a structured routing DSL                                                  |
-| [kotlinx.serialization](https://start.ktor.io/p/kotlinx-serialization) | Handles JSON serialization using kotlinx.serialization library                     |
-
-## Building & Running
-
-To build or run the project, use one of the following tasks:
-
-| Task                                    | Description                                                          |
-| -----------------------------------------|---------------------------------------------------------------------- |
-| `./gradlew test`                        | Run the tests                                                        |
-| `./gradlew build`                       | Build everything                                                     |
-| `./gradlew buildFatJar`                 | Build an executable JAR of the server with all dependencies included |
-| `./gradlew buildImage`                  | Build the docker image to use with the fat JAR                       |
-| `./gradlew publishImageToLocalRegistry` | Publish the docker image locally                                     |
-| `./gradlew run`                         | Run the server                                                       |
-| `./gradlew runDocker`                   | Run using the local docker image                                     |
-
-If the server starts successfully, you'll see the following output:
-
-```
-2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
-2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
+```bash
+docker run -d \
+  --name cohort-db \
+  -e POSTGRES_DB=cohort \
+  -e POSTGRES_USER=cohort \
+  -e POSTGRES_PASSWORD=cohort \
+  -p 5432:5432 \
+  postgres:16
 ```
 
+The schema is applied automatically at startup — no manual migrations needed.
+
+### 2. Environment variables
+
+| Variable | Default | Required |
+|---|---|---|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/cohort` | No |
+| `DB_USER` | `cohort` | No |
+| `DB_PASSWORD` | `cohort` | No |
+| `OPENAI_API_KEY` | — | Yes (for `/studycard`) |
+
+Export before running:
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+### 3. Run
+
+```bash
+./gradlew run
+```
+
+Open in browser:
+http://localhost:8080/health
+
+---
+
+## API endpoints
+
+### Health check
+
+```bash
+curl http://localhost:8080/health
+```
+
+```json
+{
+  "status": "ok",
+  "ktor": "up",
+  "openAlex": "up",
+  "openAiKey": "present"
+}
+```
+
+### Search papers
+
+```bash
+curl "http://localhost:8080/search?q=stress+sleep&page=1&perPage=5"
+```
+
+Searches scientific papers via OpenAlex, returns metadata (title, year, DOI, abstract), and persists results to PostgreSQL.
+
+### Generate a study card
+Generates a structured summary (TL;DR, study design, limitations, key findings) using an LLM.
+
+From a DOI:
+
+```bash
+curl "http://localhost:8080/studycard?doi=10.1038/s41586-021-03819-2"
+```
+
+From a PDF URL:
+
+```bash
+curl "http://localhost:8080/studycard?url=https://example.com/paper.pdf"
+```
+
+### Extract PDF text
+
+```bash
+curl "http://localhost:8080/pdftext?url=https://example.com/paper.pdf"
+```
+
+### History
+
+```bash
+curl http://localhost:8080/search/history
+curl http://localhost:8080/studycards/recent
+```
+
+### Analytics
+
+```bash
+curl http://localhost:8080/analytics/top-searches
+curl http://localhost:8080/analytics/popular-papers
+```
+
+---
+
+## Database tables
+
+| Table | Purpose |
+|---|---|
+| `papers` | Deduplicated paper records (DOI, title, abstract, year) |
+| `search_queries` | Every `/search` call with its query text and pagination |
+| `search_results` | Join table linking a query to the papers it returned, with rank |
+| `study_cards` | Generated cards (TL;DR, key findings, study design, limitations) |
+
+The schema lives in `src/main/resources/schema.sql` and uses `IF NOT EXISTS` so it is safe to re-run.
+
+---
+
+## Rate limits
+
+Expensive endpoints are protected per client IP:
+
+| Endpoint | Limit |
+|---|---|
+| `/search` | 30 requests / minute |
+| `/studycard` | 10 requests / minute |
+
+Exceeding the limit returns `429 Too Many Requests`. Response headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` are included on every response from these endpoints.
+
+---
+
+## Notes
+
+**Connection pooling** — HikariCP manages a pool of up to 10 PostgreSQL connections. The pool is initialized once at startup and shared across all requests.
+
+**Structured logging** — SLF4J with Logback. Logs are written to stdout in plain text. The Ktor `CallLogging` plugin logs every request at `INFO` level. Configure log levels in `src/main/resources/logback.xml`.
