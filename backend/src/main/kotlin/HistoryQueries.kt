@@ -27,6 +27,7 @@ data class SearchHistoryEntry(
 object HistoryQueries {
 
     suspend fun getRecentStudyCards(): List<RecentStudyCard> = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext emptyList()
         val sql = """
             SELECT
                 sc.created_at,
@@ -63,6 +64,7 @@ object HistoryQueries {
     }
 
     suspend fun getSearchHistory(): List<SearchHistoryEntry> = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext emptyList()
         val sql = """
             SELECT query_text, page, per_page, total_count, executed_at
             FROM search_queries

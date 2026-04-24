@@ -11,6 +11,7 @@ object SearchPersistence {
     private val log = LoggerFactory.getLogger(SearchPersistence::class.java)
 
     suspend fun save(result: SearchResult) = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext
         try {
             Database.connect().use { conn ->
                 conn.autoCommit = false

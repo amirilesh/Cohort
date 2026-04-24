@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cohort — Read Real Research</title>
+    <meta name="description" content="Search scientific papers and read them in plain language with study cards, citations, and reliability heuristics.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header id="header">
+            <div class="header-inner">
+                <div class="logo" id="logo-home">
+                    <span class="logo-icon">🧬</span>
+                    <span class="logo-text">Cohort</span>
+                </div>
+                <nav class="tabs" id="nav-tabs">
+                    <button class="tab active" data-tab="search" id="tab-search">
+                        <span class="tab-icon">🔍</span>
+                        <span>Search</span>
+                    </button>
+                    <button class="tab" data-tab="history" id="tab-history">
+                        <span class="tab-icon">📚</span>
+                        <span>History</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Search Tab -->
+        <main id="view-search" class="view active">
+            <!-- Hero / Search Section -->
+            <section class="hero" id="hero-section">
+                <div class="hero-glow"></div>
+                <h1 class="hero-title">Read real research<br><span class="gradient-text">without the jargon</span></h1>
+                <p class="hero-subtitle">Search scientific papers and get plain-language study cards</p>
+                <form class="search-bar" id="search-form">
+                    <div class="search-input-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Search papers (e.g. sleep, stress, creatine...)"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <button type="submit" class="btn-search" id="btn-search">Search</button>
+                </form>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display:none;">
+                <div class="results-header">
+                    <h2 id="results-title">Results</h2>
+                    <span class="results-count" id="results-count"></span>
+                </div>
+                <div class="results-list" id="results-list">
+                    <!-- Paper cards rendered here by JS -->
+                </div>
+            </section>
+
+            <!-- Study Card Section -->
+            <section class="studycard-section" id="studycard-section" style="display:none;">
+                <button class="btn-back" id="btn-back">
+                    <span>←</span> Back to results
+                </button>
+
+                <!-- Loading State -->
+                <div class="loading-container" id="loading-container" style="display:none;">
+                    <div class="loading-card">
+                        <div class="loading-pulse"></div>
+                        <h3 class="loading-title">Generating Study Card</h3>
+                        <div class="loading-steps" id="loading-steps">
+                            <div class="loading-step active" id="step-find">
+                                <span class="step-icon spinner">📄</span>
+                                <span class="step-text">Finding paper...</span>
+                            </div>
+                            <div class="loading-step" id="step-extract">
+                                <span class="step-icon">📑</span>
+                                <span class="step-text">Extracting PDF...</span>
+                            </div>
+                            <div class="loading-step" id="step-generate">
+                                <span class="step-icon">🧠</span>
+                                <span class="step-text">Generating study card...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div class="error-container" id="error-container" style="display:none;">
+                    <div class="error-card">
+                        <span class="error-icon">❌</span>
+                        <h3 class="error-title">Could not generate study card</h3>
+                        <p class="error-reason" id="error-reason">Reason: no accessible PDF</p>
+                        <button class="btn-retry" id="btn-retry">Try again</button>
+                    </div>
+                </div>
+
+                <!-- Study Card Content -->
+                <div class="studycard-content" id="studycard-content" style="display:none;">
+                    <div class="studycard">
+                        <div class="studycard-header">
+                            <h2 class="studycard-paper-title" id="sc-paper-title"></h2>
+                            <span class="source-badge" id="sc-source-badge">Source: LLM</span>
+                        </div>
+
+                        <div class="sc-section sc-tldr">
+                            <div class="sc-section-label">
+                                <span class="sc-section-icon">🧠</span>
+                                TL;DR
+                            </div>
+                            <p id="sc-tldr"></p>
+                        </div>
+
+                        <div class="sc-section sc-design">
+                            <div class="sc-section-label">
+                                <span class="sc-section-icon">📊</span>
+                                Study Design
+                            </div>
+                            <p id="sc-design"></p>
+                        </div>
+
+                        <div class="sc-section sc-findings">
+                            <div class="sc-section-label">
+                                <span class="sc-section-icon">🔑</span>
+                                Key Findings
+                            </div>
+                            <ul id="sc-findings"></ul>
+                        </div>
+
+                        <div class="sc-section sc-limitations">
+                            <div class="sc-section-label">
+                                <span class="sc-section-icon">⚠️</span>
+                                Limitations
+                            </div>
+                            <p id="sc-limitations"></p>
+                        </div>
+
+                        <div class="sc-meta" id="sc-meta">
+                            <a href="#" id="sc-doi-link" target="_blank" class="doi-link">View original paper ↗</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- History Tab -->
+        <main id="view-history" class="view" style="display:none;">
+            <section class="history-section">
+                <h2 class="history-title">Recent Study Cards</h2>
+                <div class="history-list" id="history-list">
+                    <!-- Rendered by JS -->
+                </div>
+                <div class="history-empty" id="history-empty" style="display:none;">
+                    <span class="history-empty-icon">📭</span>
+                    <p>No study cards generated yet.<br>Search for a topic to get started!</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

@@ -13,6 +13,7 @@ object StudyCardPersistence {
     private val log = LoggerFactory.getLogger(StudyCardPersistence::class.java)
 
     suspend fun save(card: StudyCardResponse, doi: String?) = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext
         try {
             Database.connect().use { conn ->
                 val paperId = if (doi != null) ensurePaperByDoi(conn, doi) else null

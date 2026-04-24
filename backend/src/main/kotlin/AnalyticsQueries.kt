@@ -21,6 +21,7 @@ data class PopularPaper(
 object AnalyticsQueries {
 
     suspend fun getTopSearches(): List<TopSearch> = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext emptyList()
         val sql = """
             SELECT query_text, COUNT(*) AS times_used
             FROM search_queries
@@ -45,6 +46,7 @@ object AnalyticsQueries {
     }
 
     suspend fun getPopularPapers(): List<PopularPaper> = withContext(Dispatchers.IO) {
+        if (!Database.isAvailable) return@withContext emptyList()
         val sql = """
             SELECT p.title, p.doi, p.publication_year, COUNT(*) AS times_returned
             FROM search_results sr

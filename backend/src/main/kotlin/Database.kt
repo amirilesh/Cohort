@@ -7,18 +7,32 @@ import java.sql.Connection
 
 object Database {
     private val log = LoggerFactory.getLogger(Database::class.java)
-    private val dataSource = HikariDataSource(
-        HikariConfig().apply {
-            jdbcUrl         = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/cohort"
-            username        = System.getenv("DB_USER")     ?: "cohort"
-            password        = System.getenv("DB_PASSWORD") ?: "cohort"
-            maximumPoolSize = 10
-        }
-    )
 
-    fun connect(): Connection = dataSource.connection
+    private val dataSource: HikariDataSource? = try {
+        HikariDataSource(
+            HikariConfig().apply {
+                jdbcUrl         = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/cohort"
+                username        = System.getenv("DB_USER")     ?: "cohort"
+                password        = System.getenv("DB_PASSWORD") ?: "cohort"
+                maximumPoolSize = 10
+            }
+        )
+    } catch (e: Exception) {
+        log.warn("Database unavailable — running without persistence: {}", e.message)
+        null
+    }
+
+    val isAvailable: Boolean get() = dataSource != null
+
+    fun connect(): Connection = dataSource?.connection
+        ?: throw IllegalStateException("Database not available")
 
     fun initSchema() {
+        if (dataSource == null) {
+            log.info("Skipping schema init — no database connection")
+            return
+        }
+
         val sql = Database::class.java.getResourceAsStream("/schema.sql")
             ?.bufferedReader()
             ?.readText()
