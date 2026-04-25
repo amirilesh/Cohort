@@ -17,14 +17,9 @@ import java.time.Duration
 data class HealthResponse(
     val status: String,
     val ktor: String,
+    val database: String,
     val openAlex: String,
     val openAiKey: String,
-)
-
-@Serializable
-data class SearchErrorResponse(
-    val success: Boolean = false,
-    val reason: String,
 )
 
 fun Application.configureRouting() {
@@ -40,6 +35,14 @@ fun Application.configureRouting() {
                 if (query.isNullOrBlank()) {
                     call.respond(
                         HttpStatusCode.BadRequest,
+                        ApiErrorResponse(reason = "missing_query"),
+                    )
+                    return@get
+                }
+                if (query.length > 200) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ApiErrorResponse(reason = "query_too_long"),
                         SearchErrorResponse(reason = "missing_query"),
                     )
                     return@get
@@ -50,6 +53,7 @@ fun Application.configureRouting() {
                 if (pageParam != null && (page == null || page < 1)) {
                     call.respond(
                         HttpStatusCode.BadRequest,
+                        ApiErrorResponse(reason = "invalid_page"),
                         SearchErrorResponse(reason = "invalid_page"),
                     )
                     return@get
@@ -60,6 +64,7 @@ fun Application.configureRouting() {
                 if (perPageParam != null && (perPage == null || perPage <= 0)) {
                     call.respond(
                         HttpStatusCode.BadRequest,
+                        ApiErrorResponse(reason = "invalid_per_page"),
                         SearchErrorResponse(reason = "invalid_per_page"),
                     )
                     return@get
@@ -79,16 +84,11 @@ fun Application.configureRouting() {
             val url = call.request.queryParameters["url"]
 
             if (url.isNullOrBlank()) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    PdfTextResponse(
-                        url = "",
-                        extractedText = null,
-                        textLength = 0,
-                        success = false,
-                        reason = "missing_url",
-                    )
-                )
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_url"))
+                return@get
+            }
+            if (url.length > 2000) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
                 return@get
             }
 
@@ -102,6 +102,15 @@ fun Application.configureRouting() {
                 val url = call.request.queryParameters["url"]
 
                 if (!doi.isNullOrBlank()) {
+                    if (doi.length > 200) {
+                        call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "doi_too_long"))
+                        return@get
+                    }
+                    val cached = StudyCardPersistence.findByDoi(doi)
+                    if (cached != null) {
+                        call.respond(cached)
+                        return@get
+                    }
                     val result = StudyCardService.generateFromDoi(doi)
                     if (result.success) StudyCardPersistence.save(result, doi)
                     call.respond(result)
@@ -109,6 +118,19 @@ fun Application.configureRouting() {
                 }
 
                 if (url.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_doi_or_url"))
+                    return@get
+                }
+                if (url.length > 2000) {
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
+                    return@get
+                }
+
+                val cached = StudyCardPersistence.findByUrl(url)
+                if (cached != null) {
+                    call.respond(cached)
+                    return@get
+                }
                     call.respond(
                         HttpStatusCode.BadRequest,
                         StudyCardResponse(
@@ -143,14 +165,16 @@ fun Application.configureRouting() {
         }
 
         get("/health") {
+            val dbStatus = Database.checkConnection()
             val openAlexStatus = checkOpenAlex()
             val openAiKeyStatus = if (System.getenv("OPENAI_API_KEY").isNullOrBlank()) "missing" else "present"
-            val overallStatus = if (openAlexStatus == "up") "ok" else "degraded"
+            val overallStatus = if (dbStatus == "up" && openAlexStatus == "up") "ok" else "degraded"
 
             call.respond(
                 HealthResponse(
                     status = overallStatus,
                     ktor = "up",
+                    database = dbStatus,
                     openAlex = openAlexStatus,
                     openAiKey = openAiKeyStatus,
                 )

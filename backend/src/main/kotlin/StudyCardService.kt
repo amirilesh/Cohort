@@ -3,6 +3,7 @@ package com.cohort
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,6 +30,7 @@ data class StudyCardResponse(
 )
 
 object StudyCardService {
+    private val log = LoggerFactory.getLogger(StudyCardService::class.java)
     private const val DEFAULT_MODEL = "gpt-4.1-mini"
     private const val MAX_INPUT_TEXT_LENGTH = 12000
     private const val FALLBACK_LIMITATIONS =
@@ -61,21 +63,26 @@ object StudyCardService {
     }
 
     fun generateFromDoi(doi: String): StudyCardResponse {
-        val pdfUrl = OpenAlexService.getOaUrlForDoi(doi)
+        val candidates = OpenAlexService.getPdfCandidatesForDoi(doi)
+            ?: return StudyCardResponse(url = "", success = false, reason = "openalex_not_found")
 
-        if (pdfUrl != null) {
-            return generate(pdfUrl)
+        if (candidates.isEmpty()) {
+            return StudyCardResponse(url = "", success = false, reason = "no_open_access_pdf")
         }
 
-        return StudyCardResponse(
-            url = "",
-            success = false,
-            reason = if (OpenAlexService.hasWorkForDoi(doi)) {
-                "no_open_access_pdf"
-            } else {
-                "openalex_not_found"
-            },
-        )
+        log.info("doi={} pdf_candidates={}", doi, candidates.size)
+
+        for (candidate in candidates) {
+            val result = generate(candidate)
+            if (result.success) {
+                log.info("doi={} pdf_success url={}", doi, candidate)
+                return result
+            }
+            log.info("doi={} pdf_failed url={} reason={}", doi, candidate, result.reason)
+        }
+
+        log.warn("doi={} all_candidates_failed count={}", doi, candidates.size)
+        return StudyCardResponse(url = "", success = false, reason = "no_accessible_pdf")
     }
 
     private fun generateFromExtractedText(url: String, extractedText: String): StudyCardResponse? {

@@ -2,15 +2,96 @@ package com.cohort
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.postgresql.util.PGobject
 import org.slf4j.LoggerFactory
 import java.sql.Connection
+import java.sql.ResultSet
 import java.util.UUID
 
 object StudyCardPersistence {
     private val log = LoggerFactory.getLogger(StudyCardPersistence::class.java)
+
+    suspend fun findByDoi(doi: String): StudyCardResponse? = withContext(Dispatchers.IO) {
+        val bare = doi.trim()
+            .removePrefix("https://doi.org/")
+            .removePrefix("http://doi.org/")
+            .removePrefix("doi:")
+            .trim()
+            .lowercase()
+
+        if (bare.isBlank()) return@withContext null
+
+        try {
+            Database.connect().use { conn ->
+                conn.prepareStatement(
+                    """
+                    SELECT sc.source_url, sc.tldr, sc.study_design, sc.limitations,
+                           sc.key_findings::text AS key_findings, sc.generation_source
+                    FROM study_cards sc
+                    JOIN papers p ON p.id = sc.paper_id
+                    WHERE LOWER(p.doi) = ?
+                    ORDER BY sc.created_at DESC
+                    LIMIT 1
+                    """.trimIndent()
+                ).use { stmt ->
+                    stmt.setString(1, "https://doi.org/$bare")
+                    val rs = stmt.executeQuery()
+                    if (!rs.next()) return@withContext null
+                    log.info("study card cache hit doi={}", bare)
+                    rowToStudyCard(rs)
+                }
+            }
+        } catch (e: Exception) {
+            log.error("failed to look up study card by doi", e)
+            null
+        }
+    }
+
+    suspend fun findByUrl(url: String): StudyCardResponse? = withContext(Dispatchers.IO) {
+        try {
+            Database.connect().use { conn ->
+                conn.prepareStatement(
+                    """
+                    SELECT source_url, tldr, study_design, limitations,
+                           key_findings::text AS key_findings, generation_source
+                    FROM study_cards
+                    WHERE source_url = ?
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                    """.trimIndent()
+                ).use { stmt ->
+                    stmt.setString(1, url)
+                    val rs = stmt.executeQuery()
+                    if (!rs.next()) return@withContext null
+                    log.info("study card cache hit url={}", url)
+                    rowToStudyCard(rs)
+                }
+            }
+        } catch (e: Exception) {
+            log.error("failed to look up study card by url", e)
+            null
+        }
+    }
+
+    private fun rowToStudyCard(rs: ResultSet): StudyCardResponse {
+        val keyFindings = try {
+            Json.decodeFromString<List<String>>(rs.getString("key_findings") ?: "[]")
+        } catch (_: Exception) {
+            emptyList()
+        }
+        return StudyCardResponse(
+            url = rs.getString("source_url"),
+            success = true,
+            source = rs.getString("generation_source"),
+            tldr = rs.getString("tldr"),
+            studyDesign = rs.getString("study_design"),
+            keyFindings = keyFindings,
+            limitations = rs.getString("limitations"),
+        )
+    }
 
     suspend fun save(card: StudyCardResponse, doi: String?) = withContext(Dispatchers.IO) {
         try {

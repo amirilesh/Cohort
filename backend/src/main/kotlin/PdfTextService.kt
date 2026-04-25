@@ -281,8 +281,13 @@ object PdfTextService {
         val pdfMatches = linkedSetOf<String>()    // direct PDF signals — preferred
         val otherMatches = linkedSetOf<String>()  // download / fulltext / article links
 
+        // citation_pdf_url: handle both attribute orderings (name-first and content-first)
         val metaRegex = Regex(
             """<meta[^>]+name=["']citation_pdf_url["'][^>]+content=["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        val metaReversedRegex = Regex(
+            """<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_pdf_url["']""",
             RegexOption.IGNORE_CASE,
         )
         val hrefRegex = Regex(
@@ -296,6 +301,9 @@ object PdfTextService {
 
         // citation_pdf_url meta tag — highest priority
         metaRegex.findAll(html).forEach { match ->
+            pdfMatches += resolveUrl(baseUrl, match.groupValues[1])
+        }
+        metaReversedRegex.findAll(html).forEach { match ->
             pdfMatches += resolveUrl(baseUrl, match.groupValues[1])
         }
 
@@ -340,17 +348,45 @@ object PdfTextService {
         return (pdfMatches + otherMatches).filter { it.isNotBlank() }
     }
 
-    // Simple URL transformations to try when HTML parsing finds no candidates
+    // URL transformations to try when HTML parsing finds no PDF candidates.
+    // Publisher-specific patterns are listed first so they take priority over generic guesses.
     private fun buildUrlVariants(url: String): List<String> {
         val variants = mutableListOf<String>()
+        val lower = url.lowercase()
 
-        if (url.contains("/full")) {
-            variants += url.replace("/full", "/pdf")
+        // PMC: /pmc/articles/PMC12345/ → /pmc/articles/PMC12345/pdf/
+        if (lower.contains("ncbi.nlm.nih.gov/pmc/articles/") ||
+            lower.contains("pmc.ncbi.nlm.nih.gov/articles/")
+        ) {
+            variants += url.trimEnd('/') + "/pdf/"
         }
-        if (url.contains("/article")) {
-            variants += url.replace("/article", "/pdf")
+
+        // Springer: /article/{doi} → /content/pdf/{doi}.pdf
+        val springerDoi = Regex("https?://link\\.springer\\.com/article/(.+)")
+            .find(url)?.groupValues?.get(1)
+        if (springerDoi != null) {
+            variants += "https://link.springer.com/content/pdf/${springerDoi.trimEnd('/')}.pdf"
         }
-        // Append .pdf only if the path has no extension and no query string
+
+        // OUP: /article/... → /article-pdf/...
+        if (lower.contains("academic.oup.com") &&
+            lower.contains("/article/") &&
+            !lower.contains("article-pdf")
+        ) {
+            variants += url.replace("/article/", "/article-pdf/")
+        }
+
+        // SciELO: append format=pdf query parameter
+        if (lower.contains("scielo")) {
+            val sep = if (url.contains("?")) "&" else "?"
+            variants += "$url${sep}format=pdf"
+        }
+
+        // Generic: /full → /pdf, /article → /pdf
+        if (url.contains("/full")) variants += url.replace("/full", "/pdf")
+        if (url.contains("/article")) variants += url.replace("/article", "/pdf")
+
+        // Generic: append .pdf if path has no extension and no query string
         try {
             val parsed = URL(url)
             val path = parsed.path
