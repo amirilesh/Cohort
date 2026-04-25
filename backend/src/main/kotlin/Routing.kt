@@ -17,6 +17,7 @@ import java.time.Duration
 data class HealthResponse(
     val status: String,
     val ktor: String,
+    val database: String,
     val openAlex: String,
     val openAiKey: String,
 )
@@ -153,14 +154,16 @@ fun Application.configureRouting() {
         }
 
         get("/health") {
+            val dbStatus = Database.checkConnection()
             val openAlexStatus = checkOpenAlex()
             val openAiKeyStatus = if (System.getenv("OPENAI_API_KEY").isNullOrBlank()) "missing" else "present"
-            val overallStatus = if (openAlexStatus == "up") "ok" else "degraded"
+            val overallStatus = if (dbStatus == "up" && openAlexStatus == "up") "ok" else "degraded"
 
             call.respond(
                 HealthResponse(
                     status = overallStatus,
                     ktor = "up",
+                    database = dbStatus,
                     openAlex = openAlexStatus,
                     openAiKey = openAiKeyStatus,
                 )
