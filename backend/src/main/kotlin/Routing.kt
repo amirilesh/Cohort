@@ -45,6 +45,13 @@ fun Application.configureRouting() {
                     )
                     return@get
                 }
+                if (query.length > 200) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        SearchErrorResponse(reason = "query_too_long"),
+                    )
+                    return@get
+                }
 
                 val pageParam = call.request.queryParameters["page"]
                 val page = pageParam?.toIntOrNull()
@@ -92,6 +99,19 @@ fun Application.configureRouting() {
                 )
                 return@get
             }
+            if (url.length > 2000) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    PdfTextResponse(
+                        url = "",
+                        extractedText = null,
+                        textLength = 0,
+                        success = false,
+                        reason = "url_too_long",
+                    )
+                )
+                return@get
+            }
 
             val result = PdfTextService.extractText(url)
             call.respond(result)
@@ -103,6 +123,13 @@ fun Application.configureRouting() {
                 val url = call.request.queryParameters["url"]
 
                 if (!doi.isNullOrBlank()) {
+                    if (doi.length > 200) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            StudyCardResponse(url = "", success = false, reason = "doi_too_long"),
+                        )
+                        return@get
+                    }
                     val cached = StudyCardPersistence.findByDoi(doi)
                     if (cached != null) {
                         call.respond(cached)
@@ -122,6 +149,13 @@ fun Application.configureRouting() {
                             success = false,
                             reason = "missing_doi_or_url",
                         )
+                    )
+                    return@get
+                }
+                if (url.length > 2000) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        StudyCardResponse(url = "", success = false, reason = "url_too_long"),
                     )
                     return@get
                 }
