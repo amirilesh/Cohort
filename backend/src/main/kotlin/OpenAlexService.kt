@@ -63,14 +63,6 @@ object OpenAlexService {
         )
     }
 
-    fun getOaUrlForDoi(doi: String): String? {
-        return getWorkByDoi(doi)?.bestOaLocation?.pdfUrl
-    }
-
-    fun hasWorkForDoi(doi: String): Boolean {
-        return getWorkByDoi(doi) != null
-    }
-
     fun getPaperByDoi(doi: String): PaperPreview? {
         val work = getWorkByDoi(doi) ?: return null
         return PaperPreview(

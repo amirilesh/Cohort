@@ -22,12 +22,6 @@ data class HealthResponse(
     val openAiKey: String,
 )
 
-@Serializable
-data class SearchErrorResponse(
-    val success: Boolean = false,
-    val reason: String,
-)
-
 fun Application.configureRouting() {
     routing {
 
@@ -41,14 +35,14 @@ fun Application.configureRouting() {
                 if (query.isNullOrBlank()) {
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        SearchErrorResponse(reason = "missing_query"),
+                        ApiErrorResponse(reason = "missing_query"),
                     )
                     return@get
                 }
                 if (query.length > 200) {
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        SearchErrorResponse(reason = "query_too_long"),
+                        ApiErrorResponse(reason = "query_too_long"),
                     )
                     return@get
                 }
@@ -58,7 +52,7 @@ fun Application.configureRouting() {
                 if (pageParam != null && (page == null || page < 1)) {
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        SearchErrorResponse(reason = "invalid_page"),
+                        ApiErrorResponse(reason = "invalid_page"),
                     )
                     return@get
                 }
@@ -68,7 +62,7 @@ fun Application.configureRouting() {
                 if (perPageParam != null && (perPage == null || perPage <= 0)) {
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        SearchErrorResponse(reason = "invalid_per_page"),
+                        ApiErrorResponse(reason = "invalid_per_page"),
                     )
                     return@get
                 }
@@ -87,29 +81,11 @@ fun Application.configureRouting() {
             val url = call.request.queryParameters["url"]
 
             if (url.isNullOrBlank()) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    PdfTextResponse(
-                        url = "",
-                        extractedText = null,
-                        textLength = 0,
-                        success = false,
-                        reason = "missing_url",
-                    )
-                )
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_url"))
                 return@get
             }
             if (url.length > 2000) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    PdfTextResponse(
-                        url = "",
-                        extractedText = null,
-                        textLength = 0,
-                        success = false,
-                        reason = "url_too_long",
-                    )
-                )
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
                 return@get
             }
 
@@ -124,10 +100,7 @@ fun Application.configureRouting() {
 
                 if (!doi.isNullOrBlank()) {
                     if (doi.length > 200) {
-                        call.respond(
-                            HttpStatusCode.BadRequest,
-                            StudyCardResponse(url = "", success = false, reason = "doi_too_long"),
-                        )
+                        call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "doi_too_long"))
                         return@get
                     }
                     val cached = StudyCardPersistence.findByDoi(doi)
@@ -142,21 +115,11 @@ fun Application.configureRouting() {
                 }
 
                 if (url.isNullOrBlank()) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        StudyCardResponse(
-                            url = "",
-                            success = false,
-                            reason = "missing_doi_or_url",
-                        )
-                    )
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_doi_or_url"))
                     return@get
                 }
                 if (url.length > 2000) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        StudyCardResponse(url = "", success = false, reason = "url_too_long"),
-                    )
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
                     return@get
                 }
 
