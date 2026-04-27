@@ -43,7 +43,6 @@ fun Application.configureRouting() {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiErrorResponse(reason = "query_too_long"),
-                        SearchErrorResponse(reason = "missing_query"),
                     )
                     return@get
                 }
@@ -54,7 +53,6 @@ fun Application.configureRouting() {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiErrorResponse(reason = "invalid_page"),
-                        SearchErrorResponse(reason = "invalid_page"),
                     )
                     return@get
                 }
@@ -65,7 +63,6 @@ fun Application.configureRouting() {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiErrorResponse(reason = "invalid_per_page"),
-                        SearchErrorResponse(reason = "invalid_per_page"),
                     )
                     return@get
                 }
@@ -131,16 +128,11 @@ fun Application.configureRouting() {
                     call.respond(cached)
                     return@get
                 }
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        StudyCardResponse(
-                            url = "",
-                            success = false,
-                            reason = "missing_doi_or_url",
-                        )
-                    )
-                    return@get
-                }
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ApiErrorResponse(reason = "missing_doi_or_url")
+                )
+                return@get
 
                 val result = StudyCardService.generate(url)
                 if (result.success) StudyCardPersistence.save(result, doi = null)
