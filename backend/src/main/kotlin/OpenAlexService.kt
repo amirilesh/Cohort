@@ -63,19 +63,6 @@ object OpenAlexService {
         )
     }
 
-    fun getPaperByDoi(doi: String): PaperPreview? {
-        val work = getWorkByDoi(doi) ?: return null
-        return PaperPreview(
-            title = work.title,
-            year = work.publicationYear,
-            doi = work.doi,
-            abstractText = reconstructAbstract(work.abstractInvertedIndex),
-            isOpenAccess = work.openAccess?.isOpenAccess,
-            oaStatus = work.openAccess?.oaStatus,
-            oaUrl = work.bestOaLocation?.pdfUrl,
-        )
-    }
-
     // Returns null when the DOI is not found on OpenAlex at all.
     // Returns an empty list when found but no PDF/landing-page URLs are available.
     // Priority: direct PDF URLs first (best → primary → rest), then landing pages as fallback.
