@@ -54,9 +54,13 @@ CREATE TABLE IF NOT EXISTS study_cards (
     key_findings      JSONB       NOT NULL DEFAULT '[]',
     generation_source TEXT        NOT NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT study_cards_generation_source_check CHECK (generation_source IN ('llm', 'fallback')),
+    CONSTRAINT study_cards_generation_source_check CHECK (generation_source IN ('llm', 'fallback', 'llm_abstract')),
     CONSTRAINT study_cards_key_findings_is_array   CHECK (jsonb_typeof(key_findings) = 'array')
 );
 
 CREATE INDEX IF NOT EXISTS study_cards_paper_id_idx
     ON study_cards (paper_id);
+
+ALTER TABLE study_cards DROP CONSTRAINT IF EXISTS study_cards_generation_source_check;
+ALTER TABLE study_cards ADD CONSTRAINT study_cards_generation_source_check
+    CHECK (generation_source IN ('llm', 'fallback', 'llm_abstract'));
