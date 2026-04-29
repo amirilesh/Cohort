@@ -33,6 +33,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.cohort.ui.history.HistoryScreen
 import com.cohort.ui.search.SearchScreen
 
 private data class BottomNavItem(
@@ -94,10 +95,7 @@ fun MainScreen(onGenerateCard: (String) -> Unit) {
                 SearchScreen(onGenerateCard = onGenerateCard)
             }
             composable("history") {
-                ComingSoonScreen(
-                    title = "History",
-                    subtitle = "Your recent searches will appear here",
-                )
+                HistoryScreen()
             }
             composable("saved") {
                 ComingSoonScreen(

@@ -32,3 +32,14 @@ data class StudyCardResponse(
     val limitations: String = "",
     val reason: String? = null,
 )
+
+@Serializable
+data class RecentStudyCard(
+    val createdAt: String,
+    val generationSource: String,
+    val sourceUrl: String,
+    val tldr: String,
+    val studyDesign: String,
+    val doi: String? = null,
+    val title: String? = null,
+)

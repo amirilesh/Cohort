@@ -1,5 +1,6 @@
 package com.cohort.data.api
 
+import com.cohort.data.model.RecentStudyCard
 import com.cohort.data.model.SearchResult
 import com.cohort.data.model.StudyCardResponse
 import retrofit2.http.GET
@@ -18,4 +19,7 @@ interface CohortApi {
     suspend fun studyCardByDoi(
         @Query("doi") doi: String,
     ): StudyCardResponse
+
+    @GET("studycards/recent")
+    suspend fun getRecentStudyCards(): List<RecentStudyCard>
 }
