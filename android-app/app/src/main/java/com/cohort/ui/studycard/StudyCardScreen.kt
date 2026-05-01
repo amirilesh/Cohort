@@ -1,14 +1,18 @@
 package com.cohort.ui.studycard
 
-import androidx.compose.foundation.border
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,22 +20,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.FormatListNumbered
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,17 +50,38 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cohort.data.model.RecentStudyCard
 import com.cohort.data.model.StudyCardResponse
 import com.cohort.ui.UiState
+
+// ── Section accent colors ───────────────────────────────────────────────
+private val Purple    = Color(0xFFA78BFA)
+private val PurpleDim = Color(0xFF1E1635)
+private val Blue      = Color(0xFF60A5FA)
+private val BlueDim   = Color(0xFF131C30)
+private val Green     = Color(0xFF4ADE80)
+private val GreenDim  = Color(0xFF122119)
+private val Orange    = Color(0xFFFBBF24)
+private val OrangeDim = Color(0xFF1F1A0E)
+private val Cyan      = Color(0xFF67E8F9)
+private val CyanDim   = Color(0xFF0E1F25)
+
+private val CardBg = Color(0xFF1A1E2E)
+
+// ────────────────────────────────────────────────────────────────────────
+// Study Card Screen (from DOI)
+// ────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,32 +92,10 @@ fun StudyCardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(doi) {
-        viewModel.load(doi)
-    }
+    LaunchedEffect(doi) { viewModel.load(doi) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Study Card",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        },
+        topBar = { StudyCardTopBar(onBack = onBack) },
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -98,20 +103,18 @@ fun StudyCardScreen(
                 .padding(innerPadding),
         ) {
             when (val state = uiState) {
-                is UiState.Idle,
-                is UiState.Loading -> LoadingContent()
+                is UiState.Idle, is UiState.Loading -> LoadingContent()
                 is UiState.Success -> StudyCardContent(card = state.data)
-                is UiState.Error   -> ErrorContent(message = state.message)
+                is UiState.Error -> ErrorContent(message = state.message)
             }
         }
     }
 }
 
-/**
- * Read-only detail screen for History items.
- * If the card has a DOI, attempts to load the full cached card from the API.
- * Otherwise displays the partial data from the History item directly.
- */
+// ────────────────────────────────────────────────────────────────────────
+// Study Card Detail Screen (from History)
+// ────────────────────────────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyCardDetailScreen(
@@ -121,39 +124,15 @@ fun StudyCardDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Try to load full card if DOI or URL is available
     LaunchedEffect(card.doi, card.sourceUrl) {
-        if (!card.doi.isNullOrBlank()) {
-            viewModel.load(card.doi)
-        } else if (card.sourceUrl.isNotBlank()) {
-            viewModel.loadByUrl(card.sourceUrl)
-        }
+        if (!card.doi.isNullOrBlank()) viewModel.load(card.doi)
+        else if (card.sourceUrl.isNotBlank()) viewModel.loadByUrl(card.sourceUrl)
     }
 
     val showFullCard = uiState is UiState.Success
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Study Card",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
-        },
+        topBar = { StudyCardTopBar(onBack = onBack) },
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -162,8 +141,7 @@ fun StudyCardDetailScreen(
         ) {
             when {
                 showFullCard -> {
-                    val fullCard = (uiState as UiState.Success).data
-                    StudyCardContent(card = fullCard)
+                    StudyCardContent(card = (uiState as UiState.Success).data)
                 }
                 uiState is UiState.Loading || uiState is UiState.Idle -> {
                     if (card.tldr.isNotBlank() || card.studyDesign.isNotBlank()) {
@@ -180,88 +158,132 @@ fun StudyCardDetailScreen(
     }
 }
 
-// ── Full study card content ─────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
+// Top bar (shared)
+// ────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StudyCardTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = {
+            Text(
+                text = "Study Card",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+        },
+        actions = {
+            IconButton(onClick = { /* bookmark – no-op for now */ }) {
+                Icon(
+                    Icons.Filled.BookmarkBorder,
+                    contentDescription = "Bookmark",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+        ),
+    )
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Full study card content
+// ────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StudyCardContent(card: StudyCardResponse) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // TL;DR — hero card with subtle primary border
+        // ── Summarized Study ────────────────────────────────────────────
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(14.dp),
-                    ),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            SectionCard(
+                accent = Purple,
+                dimBg = PurpleDim,
+                icon = Icons.Filled.AutoAwesome,
+                title = "Summarized Study",
+                chip = "AI Summary",
+                subtitle = "AI-generated summary of key findings\nand insights from this research.",
+                showChevron = true,
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = "TL;DR",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = card.tldr,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-        }
-
-        // Study Design
-        item {
-            SectionCard(icon = Icons.Filled.Science, title = "Study Design") {
                 Text(
-                    text = card.studyDesign,
+                    text = card.tldr,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 22.sp,
                 )
             }
         }
 
-        // Key Findings
+        // ── Study Design ────────────────────────────────────────────────
+        item {
+            SectionCard(
+                accent = Blue,
+                dimBg = BlueDim,
+                icon = Icons.Filled.Science,
+                title = "Study Design",
+            ) {
+                Text(
+                    text = card.studyDesign,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 22.sp,
+                )
+            }
+        }
+
+        // ── Key Findings ────────────────────────────────────────────────
         if (card.keyFindings.isNotEmpty()) {
             item {
-                SectionCard(icon = Icons.Filled.FormatListNumbered, title = "Key Findings") {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionCard(
+                    accent = Green,
+                    dimBg = GreenDim,
+                    icon = Icons.Outlined.FormatListNumbered,
+                    title = "Key Findings",
+                ) {
+                    Column {
                         card.keyFindings.forEachIndexed { index, finding ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    modifier = Modifier.size(22.dp),
+                            val isLast = index == card.keyFindings.lastIndex
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Min),
+                            ) {
+                                // Number badge + vertical connecting line
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .width(32.dp)
+                                        .fillMaxHeight(),
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .border(1.5.dp, Green, CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
                                         Text(
                                             text = "${index + 1}",
-                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.primary,
+                                            color = Green,
+                                        )
+                                    }
+                                    if (!isLast) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(1.5.dp)
+                                                .weight(1f)
+                                                .background(Green.copy(alpha = 0.25f)),
                                         )
                                     }
                                 }
@@ -269,7 +291,14 @@ private fun StudyCardContent(card: StudyCardResponse) {
                                     text = finding,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
+                                    lineHeight = 22.sp,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(
+                                            start = 12.dp,
+                                            top = 2.dp,
+                                            bottom = if (isLast) 0.dp else 16.dp,
+                                        ),
                                 )
                             }
                         }
@@ -278,59 +307,65 @@ private fun StudyCardContent(card: StudyCardResponse) {
             }
         }
 
-        // Limitations
+        // ── Limitations ─────────────────────────────────────────────────
         item {
-            SectionCard(icon = Icons.Filled.Warning, title = "Limitations") {
+            SectionCard(
+                accent = Orange,
+                dimBg = OrangeDim,
+                icon = Icons.Filled.Warning,
+                title = "Limitations",
+            ) {
                 Text(
                     text = card.limitations,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 22.sp,
                 )
             }
         }
 
-        // Source badge
+        // ── Open Full Paper ─────────────────────────────────────────────
+        if (card.url.isNotBlank()) {
+            item { OpenPaperCard(url = card.url) }
+        }
+
+        // ── Source badge ────────────────────────────────────────────────
         item { SourceBadge(source = card.source) }
 
-        // Open paper button
-        if (card.url.isNotBlank()) {
-            item { OpenPaperButton(url = card.url) }
-        }
+        // Bottom spacing
+        item { Spacer(Modifier.height(8.dp)) }
     }
 }
 
-// ── History detail content (partial data from RecentStudyCard) ───────────
+// ────────────────────────────────────────────────────────────────────────
+// History detail content
+// ────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun HistoryDetailContent(card: RecentStudyCard) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        // Title card
+        // Title
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(14.dp),
-                    ),
-                shape = RoundedCornerShape(14.dp),
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         text = card.title ?: card.sourceUrl,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = formatHistoryDate(card.createdAt),
                         style = MaterialTheme.typography.labelSmall,
@@ -343,45 +378,20 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
         // TL;DR
         if (card.tldr.isNotBlank()) {
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(14.dp),
-                        ),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                SectionCard(
+                    accent = Purple,
+                    dimBg = PurpleDim,
+                    icon = Icons.Filled.AutoAwesome,
+                    title = "Summarized Study",
+                    chip = "AI Summary",
+                    subtitle = "AI-generated summary from this research.",
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.AutoAwesome,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = "TL;DR",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = card.tldr,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
+                    Text(
+                        text = card.tldr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 22.sp,
+                    )
                 }
             }
         }
@@ -389,11 +399,17 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
         // Study Design
         if (card.studyDesign.isNotBlank()) {
             item {
-                SectionCard(icon = Icons.Filled.Science, title = "Study Design") {
+                SectionCard(
+                    accent = Blue,
+                    dimBg = BlueDim,
+                    icon = Icons.Filled.Science,
+                    title = "Study Design",
+                ) {
                     Text(
                         text = card.studyDesign,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 22.sp,
                     )
                 }
             }
@@ -404,12 +420,12 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
             item { SourceBadge(source = card.generationSource) }
         }
 
-        // Open paper button
+        // Open paper
         if (card.sourceUrl.isNotBlank()) {
-            item { OpenPaperButton(url = card.sourceUrl) }
+            item { OpenPaperCard(url = card.sourceUrl) }
         }
 
-        // Limited info notice
+        // Info notice
         item {
             Row(
                 modifier = Modifier
@@ -422,52 +438,243 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
                     imageVector = Icons.Filled.Info,
                     contentDescription = null,
                     modifier = Modifier.size(13.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = "Showing summary from history",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
         }
     }
 }
 
-// ── Shared composables ──────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────
+// SectionCard — color-coded card with icon, title, optional chip & chevron
+// ────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun OpenPaperButton(url: String) {
-    val context = LocalContext.current
-    Box(
+private fun SectionCard(
+    accent: Color,
+    dimBg: Color,
+    icon: ImageVector,
+    title: String,
+    chip: String? = null,
+    subtitle: String? = null,
+    showChevron: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        contentAlignment = Alignment.Center,
+            .border(
+                width = 1.dp,
+                color = accent.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBg),
     ) {
-        FilledTonalButton(
-            onClick = {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                )
+        Column(modifier = Modifier.padding(20.dp)) {
+            // ── Header row ──────────────────────────────────────────────
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // Colored circle icon
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(dimBg),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = accent,
+                    )
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                // Title + chip + subtitle
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accent,
+                            fontSize = 15.sp,
+                        )
+                        // "AI Summary" chip
+                        if (chip != null) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = accent.copy(alpha = 0.15f),
+                            ) {
+                                Text(
+                                    text = chip,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = accent,
+                                    modifier = Modifier.padding(
+                                        horizontal = 6.dp,
+                                        vertical = 2.dp,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    if (subtitle != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
+
+                // Chevron (for expandable sections)
+                if (showChevron) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = accent,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Body content ────────────────────────────────────────────
+            content()
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Open Full Paper card
+// ────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun OpenPaperCard(url: String) {
+    val context = LocalContext.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Cyan.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .clickable {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             },
-            shape = RoundedCornerShape(10.dp),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(CyanDim),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Description,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Cyan,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Open Full Paper",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Cyan,
+                    fontSize = 15.sp,
+                )
+                Text(
+                    text = "View original research",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Icon(
-                imageVector = Icons.Filled.OpenInBrowser,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Open paper",
-                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.size(22.dp),
+                tint = Cyan,
             )
         }
     }
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Source badge
+// ────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SourceBadge(source: String) {
+    val isAi = source.lowercase() in listOf("llm", "llm_abstract")
+    val label = when (source.lowercase()) {
+        "llm", "llm_abstract" -> "Generated by Cohort AI"
+        "fallback"            -> "Text extraction"
+        else                  -> source
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = if (isAi) Purple.copy(alpha = 0.1f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = if (isAi) Purple else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isAi) Purple else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Loading content
+// ────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun LoadingContent() {
@@ -481,7 +688,7 @@ private fun LoadingContent() {
         CircularProgressIndicator(
             modifier = Modifier.size(40.dp),
             strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
+            color = Purple,
         )
         Spacer(Modifier.height(24.dp))
         Text(
@@ -497,11 +704,11 @@ private fun LoadingContent() {
         )
         Spacer(Modifier.height(24.dp))
         Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(12.dp),
+            color = CardBg,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.padding(14.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -509,7 +716,7 @@ private fun LoadingContent() {
                     imageVector = Icons.Filled.AutoAwesome,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Purple,
                 )
                 Text(
                     text = "Cohort AI is reading the paper and creating a concise study card.",
@@ -521,94 +728,9 @@ private fun LoadingContent() {
     }
 }
 
-@Composable
-private fun SectionCard(
-    icon: ImageVector,
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline,
-                shape = RoundedCornerShape(14.dp),
-            ),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outline,
-            )
-            content()
-        }
-    }
-}
-
-@Composable
-private fun SourceBadge(source: String) {
-    val isAi = source.lowercase() in listOf("llm", "llm_abstract")
-    val label = when (source.lowercase()) {
-        "llm"          -> "Generated by Cohort AI"
-        "llm_abstract" -> "Generated by Cohort AI"
-        "fallback"     -> "Text extraction"
-        else           -> source
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = if (isAi) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = if (isAi) MaterialTheme.colorScheme.primary
-                           else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isAi) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
+// ────────────────────────────────────────────────────────────────────────
+// Error content
+// ────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ErrorContent(message: String) {
