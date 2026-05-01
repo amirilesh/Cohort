@@ -2,6 +2,7 @@ package com.cohort.ui.history
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,7 +43,10 @@ import com.cohort.data.model.RecentStudyCard
 import com.cohort.ui.UiState
 
 @Composable
-fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
+fun HistoryScreen(
+    onCardClick: (RecentStudyCard) -> Unit = {},
+    viewModel: HistoryViewModel = viewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -141,7 +145,10 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(cards) { card ->
-                            RecentCardItem(card = card)
+                            RecentCardItem(
+                                card = card,
+                                onClick = { onCardClick(card) },
+                            )
                         }
                     }
                 }
@@ -151,10 +158,15 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
 }
 
 @Composable
-private fun RecentCardItem(card: RecentStudyCard) {
+private fun RecentCardItem(
+    card: RecentStudyCard,
+    onClick: () -> Unit,
+) {
     val context = LocalContext.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),

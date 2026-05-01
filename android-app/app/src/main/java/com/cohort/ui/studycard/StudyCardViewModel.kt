@@ -27,4 +27,17 @@ class StudyCardViewModel : ViewModel() {
             }
         }
     }
+
+    fun loadByUrl(url: String) {
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+            _uiState.value = try {
+                val card = ApiClient.api.studyCardByUrl(url)
+                if (card.success) UiState.Success(card)
+                else UiState.Error(card.reason ?: "Failed to load study card")
+            } catch (e: Exception) {
+                UiState.Error(e.message ?: "Request failed")
+            }
+        }
+    }
 }

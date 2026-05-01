@@ -6,12 +6,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.cohort.data.model.RecentStudyCard
 import com.cohort.ui.MainScreen
 import com.cohort.ui.SplashScreen
 import com.cohort.ui.WelcomeScreen
+import com.cohort.ui.studycard.StudyCardDetailScreen
 import com.cohort.ui.studycard.StudyCardScreen
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.net.URLDecoder
 import java.net.URLEncoder
+
+private val navJson = Json { ignoreUnknownKeys = true }
 
 @Composable
 fun AppNavigation() {
@@ -40,7 +46,14 @@ fun AppNavigation() {
                 onGenerateCard = { doi ->
                     val encoded = URLEncoder.encode(doi, "UTF-8")
                     navController.navigate("studycard/$encoded")
-                }
+                },
+                onOpenStudyCard = { card ->
+                    val json = URLEncoder.encode(
+                        navJson.encodeToString(card),
+                        "UTF-8",
+                    )
+                    navController.navigate("studycard/history/$json")
+                },
             )
         }
 
@@ -54,6 +67,21 @@ fun AppNavigation() {
             )
             StudyCardScreen(
                 doi = doi,
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            route = "studycard/history/{cardJson}",
+            arguments = listOf(navArgument("cardJson") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val cardJson = URLDecoder.decode(
+                backStackEntry.arguments?.getString("cardJson") ?: "",
+                "UTF-8",
+            )
+            val card = navJson.decodeFromString<RecentStudyCard>(cardJson)
+            StudyCardDetailScreen(
+                card = card,
                 onBack = { navController.popBackStack() },
             )
         }

@@ -20,6 +20,11 @@ interface CohortApi {
         @Query("doi") doi: String,
     ): StudyCardResponse
 
+    @GET("studycard")
+    suspend fun studyCardByUrl(
+        @Query("url") url: String,
+    ): StudyCardResponse
+
     @GET("studycards/recent")
     suspend fun getRecentStudyCards(): List<RecentStudyCard>
 }

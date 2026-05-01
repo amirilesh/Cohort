@@ -33,6 +33,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.cohort.data.model.RecentStudyCard
 import com.cohort.ui.history.HistoryScreen
 import com.cohort.ui.search.SearchScreen
 
@@ -50,7 +51,10 @@ private val bottomNavItems = listOf(
 )
 
 @Composable
-fun MainScreen(onGenerateCard: (String) -> Unit) {
+fun MainScreen(
+    onGenerateCard: (String) -> Unit,
+    onOpenStudyCard: (RecentStudyCard) -> Unit,
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -95,7 +99,7 @@ fun MainScreen(onGenerateCard: (String) -> Unit) {
                 SearchScreen(onGenerateCard = onGenerateCard)
             }
             composable("history") {
-                HistoryScreen()
+                HistoryScreen(onCardClick = onOpenStudyCard)
             }
             composable("saved") {
                 ComingSoonScreen(
