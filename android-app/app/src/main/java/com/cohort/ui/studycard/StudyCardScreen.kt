@@ -127,7 +127,13 @@ fun StudyCardScreen(
         ) {
             when (val state = uiState) {
                 is UiState.Idle, is UiState.Loading -> LoadingContent()
-                is UiState.Success -> StudyCardContent(card = state.data)
+                is UiState.Success -> {
+                    if (state.data.sourceType == "METADATA_ONLY") {
+                        MetadataOnlyContent(card = state.data)
+                    } else {
+                        StudyCardContent(card = state.data)
+                    }
+                }
                 is UiState.Error -> ErrorContent(message = state.message)
             }
         }
@@ -532,7 +538,7 @@ private fun SectionCard(
         Column(modifier = Modifier.padding(20.dp)) {
             // ── Header row ──────────────────────────────────────────────
             Row(
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 // Colored circle icon
@@ -776,6 +782,100 @@ private fun LoadingContent() {
                 )
             }
         }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Metadata-only fallback content
+// ────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MetadataOnlyContent(card: StudyCardResponse) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // ── Notice ──────────────────────────────────────────────────────
+        item {
+            SectionCard(
+                accent = Orange,
+                dimBg = OrangeDim,
+                icon = Icons.Filled.Info,
+                title = "Limited Information",
+                subtitle = "Full study card could not be generated.\nShowing available metadata only.",
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Title
+                    val displayTitle = card.title ?: card.url
+                    MetadataRow(label = "Title", value = displayTitle)
+
+                    // Year
+                    if (card.year != null) {
+                        MetadataRow(label = "Year", value = card.year.toString())
+                    }
+
+                    // DOI
+                    if (!card.doi.isNullOrBlank()) {
+                        MetadataRow(label = "DOI", value = card.doi)
+                    }
+
+                    // Reason
+                    if (!card.reason.isNullOrBlank()) {
+                        val reasonText = when (card.reason) {
+                            "no_open_access_pdf" -> "No open-access PDF available for this paper."
+                            "no_accessible_pdf" -> "Could not access any PDF source for this paper."
+                            else -> card.reason
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = reasonText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Open paper ──────────────────────────────────────────────────
+        val paperUrl = card.url.ifBlank { card.doi ?: "" }
+        if (paperUrl.isNotBlank()) {
+            item { OpenPaperCard(url = paperUrl) }
+        }
+
+        item { Spacer(Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun MetadataRow(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = 22.sp,
+        )
     }
 }
 

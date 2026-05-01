@@ -22,12 +22,16 @@ data class StudyCardResponse(
     val url: String,
     val success: Boolean,
     val source: String = "",
+    val sourceType: String = "FULL_TEXT",
     val tldr: String = "",
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
     val isSaved: Boolean = false,
     val reason: String? = null,
+    val title: String? = null,
+    val year: Int? = null,
+    val doi: String? = null,
 )
 
 object StudyCardService {
@@ -64,11 +68,13 @@ object StudyCardService {
     }
 
     fun generateFromDoi(doi: String): StudyCardResponse {
+        val paper = OpenAlexService.getPaperByDoi(doi)
         val candidates = OpenAlexService.getPdfCandidatesForDoi(doi)
             ?: return StudyCardResponse(url = "", success = false, reason = "openalex_not_found")
 
         if (candidates.isEmpty()) {
-            return StudyCardResponse(url = "", success = false, reason = "no_open_access_pdf")
+            log.info("doi={} no_pdf_candidates, trying abstract fallback", doi)
+            return generateFromAbstractOrMetadata(doi, paper, "no_open_access_pdf")
         }
 
         log.info("doi={} pdf_candidates={}", doi, candidates.size)
@@ -82,8 +88,48 @@ object StudyCardService {
             log.info("doi={} pdf_failed url={} reason={}", doi, candidate, result.reason)
         }
 
-        log.warn("doi={} all_candidates_failed count={}", doi, candidates.size)
-        return StudyCardResponse(url = "", success = false, reason = "no_accessible_pdf")
+        log.warn("doi={} all_candidates_failed count={}, trying abstract fallback", doi, candidates.size)
+        return generateFromAbstractOrMetadata(doi, paper, "no_accessible_pdf")
+    }
+
+    private fun generateFromAbstractOrMetadata(doi: String, paper: PaperPreview?, reason: String): StudyCardResponse {
+        log.info(
+            "abstract_fallback doi={} title={} year={} abstract_len={}",
+            doi,
+            paper?.title,
+            paper?.year,
+            paper?.abstractText?.length ?: 0
+        )
+        val doiUrl = "https://doi.org/${doi.trim().removePrefix("https://doi.org/").removePrefix("http://doi.org/").removePrefix("doi:").trim()}"
+        val url = paper?.oaUrl ?: doiUrl
+
+        val abstractText = paper?.abstractText
+        if (!abstractText.isNullOrBlank()) {
+            log.info("doi={} generating from abstract ({} chars)", doi, abstractText.length)
+            val llmResult = generateFromExtractedText(url, abstractText)
+            if (llmResult != null && llmResult.success) {
+                return llmResult.copy(
+                    source = "llm_abstract",
+                    sourceType = "ABSTRACT_ONLY",
+                    title = paper.title,
+                    year = paper.year,
+                    doi = paper.doi ?: doiUrl,
+                )
+            }
+            log.info("doi={} abstract LLM failed, returning metadata only", doi)
+        } else {
+            log.info("doi={} no abstract available, returning metadata only", doi)
+        }
+
+        return StudyCardResponse(
+            url = url,
+            success = false,
+            sourceType = "METADATA_ONLY",
+            reason = reason,
+            title = paper?.title,
+            year = paper?.year,
+            doi = paper?.doi ?: doiUrl,
+        )
     }
 
     private fun generateFromExtractedText(url: String, extractedText: String): StudyCardResponse? {

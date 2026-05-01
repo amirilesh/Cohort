@@ -26,12 +26,16 @@ data class StudyCardResponse(
     val url: String,
     val success: Boolean,
     val source: String = "",
+    val sourceType: String = "FULL_TEXT",
     val tldr: String = "",
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
     val isSaved: Boolean = false,
     val reason: String? = null,
+    val title: String? = null,
+    val year: Int? = null,
+    val doi: String? = null,
 )
 
 @Serializable

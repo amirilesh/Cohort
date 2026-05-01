@@ -33,6 +33,8 @@ class StudyCardViewModel : ViewModel() {
                 if (card.success) {
                     syncSavedState(card.isSaved)
                     UiState.Success(card)
+                } else if (card.sourceType == "METADATA_ONLY") {
+                    UiState.Success(card)
                 } else {
                     UiState.Error(card.reason ?: "Failed to generate study card")
                 }
