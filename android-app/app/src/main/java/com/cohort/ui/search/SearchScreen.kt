@@ -1,5 +1,6 @@
 package com.cohort.ui.search
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,8 +45,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -70,29 +68,28 @@ fun SearchScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ── Compact header ────────────────────────────────────────────────
+        // ── Header ────────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(top = 14.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(top = 16.dp, bottom = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CohortLogo(size = 36.dp)
+                CohortLogo(size = 34.dp)
                 Column {
                     Text(
                         text = "Cohort",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
                         text = "AI-powered study cards for research papers",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -105,7 +102,7 @@ fun SearchScreen(
                     Text(
                         text = "Search papers (e.g. CRISPR, sleep, obesity)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF94A3B8),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     )
                 },
                 leadingIcon = {
@@ -113,7 +110,7 @@ fun SearchScreen(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = Color(0xFF94A3B8),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     )
                 },
                 trailingIcon = {
@@ -133,11 +130,11 @@ fun SearchScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor        = MaterialTheme.colorScheme.onSurface,
                     unfocusedTextColor      = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor      = MaterialTheme.colorScheme.primary,
+                    focusedBorderColor      = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                     unfocusedBorderColor    = MaterialTheme.colorScheme.outline,
                     focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -162,15 +159,25 @@ fun SearchScreen(
                 val results = state.data.results
                 if (results.isEmpty()) {
                     Box(
-                        Modifier.fillMaxSize().padding(32.dp),
+                        Modifier.fillMaxSize().padding(40.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = "No results found.\nTry a different query.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "No results found",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                            Text(
+                                text = "Try a different query",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 } else {
                     val listState = rememberLazyListState()
@@ -189,15 +196,15 @@ fun SearchScreen(
                         Text(
                             text = "Showing ${results.size} of ${state.data.totalCount} results · \"${state.data.query}\"",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF94A3B8),
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                         )
                         LazyColumn(
                             state = listState,
                             contentPadding = PaddingValues(
-                                start = 16.dp, end = 16.dp, bottom = 20.dp,
+                                start = 16.dp, end = 16.dp, bottom = 24.dp,
                             ),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             items(results) { paper ->
                                 PaperCard(paper = paper, onGenerateCard = onGenerateCard)
@@ -207,11 +214,11 @@ fun SearchScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 12.dp),
+                                            .padding(vertical = 16.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp),
+                                            modifier = Modifier.size(20.dp),
                                             strokeWidth = 2.dp,
                                             color = MaterialTheme.colorScheme.primary,
                                         )
@@ -231,14 +238,13 @@ private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 28.dp),
+            .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = "Discover papers.\nGenerate study cards.",
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
         )
@@ -249,19 +255,19 @@ private fun EmptyState() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(36.dp))
+        Spacer(Modifier.height(40.dp))
         FeatureRow(
             icon = Icons.Outlined.Search,
             title = "Smart search",
             subtitle = "Powered by OpenAlex · 250M+ papers indexed",
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(18.dp))
         FeatureRow(
             icon = Icons.Filled.AutoAwesome,
             title = "AI study cards",
             subtitle = "Instant summaries for any open-access paper",
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(18.dp))
         FeatureRow(
             icon = Icons.Filled.Bookmark,
             title = "Save & revisit",
@@ -273,20 +279,20 @@ private fun EmptyState() {
 @Composable
 private fun FeatureRow(icon: ImageVector, title: String, subtitle: String) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Surface(
             shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.size(38.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(17.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -295,7 +301,7 @@ private fun FeatureRow(icon: ImageVector, title: String, subtitle: String) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Text(
@@ -312,16 +318,16 @@ private fun SearchingState() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
-                strokeWidth = 3.dp,
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 2.dp,
             )
             Text(
                 text = "Searching papers…",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -336,18 +342,17 @@ private fun ErrorState(message: String) {
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = "Search failed",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.error,
             )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF64748B),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
         }
@@ -359,27 +364,19 @@ private fun PaperCard(
     paper: PaperPreview,
     onGenerateCard: (String) -> Unit,
 ) {
-    val primary   = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        primary.copy(alpha = 0.4f),
-                        secondary.copy(alpha = 0.3f),
-                        primary.copy(alpha = 0.2f),
-                    )
-                ),
-                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(14.dp),
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -387,25 +384,24 @@ private fun PaperCard(
             ) {
                 Text(
                     text = paper.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
                 )
                 if (paper.year != null) {
                     Text(
                         text = "${paper.year}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             if (!paper.abstractText.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = paper.abstractText,
                     style = MaterialTheme.typography.bodySmall,
@@ -416,7 +412,7 @@ private fun PaperCard(
             }
 
             if (paper.doi != null) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -424,23 +420,22 @@ private fun PaperCard(
                     FilledTonalButton(
                         onClick = { onGenerateCard(paper.doi) },
                         shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.AutoAwesome,
                             contentDescription = null,
                             modifier = Modifier.size(13.dp),
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = "Generate Card",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.labelMedium,
                         )
                     }
                 }
             } else {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = "No DOI available",
                     style = MaterialTheme.typography.labelSmall,

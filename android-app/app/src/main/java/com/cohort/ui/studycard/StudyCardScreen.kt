@@ -30,6 +30,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,7 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -46,7 +46,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -76,7 +75,7 @@ fun StudyCardScreen(
                 title = {
                     Text(
                         text = "Study Card",
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 navigationIcon = {
@@ -131,7 +130,6 @@ fun StudyCardDetailScreen(
         }
     }
 
-    // Determine whether we have a loaded full card or should show partial data
     val showFullCard = uiState is UiState.Success
 
     Scaffold(
@@ -140,7 +138,7 @@ fun StudyCardDetailScreen(
                 title = {
                     Text(
                         text = "Study Card",
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 navigationIcon = {
@@ -163,12 +161,10 @@ fun StudyCardDetailScreen(
                 .padding(innerPadding),
         ) {
             when {
-                // Full card loaded from cache
                 showFullCard -> {
                     val fullCard = (uiState as UiState.Success).data
                     StudyCardContent(card = fullCard)
                 }
-                // Still loading — show partial data from History while we wait
                 uiState is UiState.Loading || uiState is UiState.Idle -> {
                     if (card.tldr.isNotBlank() || card.studyDesign.isNotBlank()) {
                         HistoryDetailContent(card = card)
@@ -176,7 +172,6 @@ fun StudyCardDetailScreen(
                         LoadingContent()
                     }
                 }
-                // API call failed — fall back to partial History data
                 uiState is UiState.Error -> {
                     HistoryDetailContent(card = card)
                 }
@@ -185,53 +180,46 @@ fun StudyCardDetailScreen(
     }
 }
 
-// ── Full study card content (existing) ───────────────────────────────────
+// ── Full study card content ─────────────────────────────────────────────
 
 @Composable
 private fun StudyCardContent(card: StudyCardResponse) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // TL;DR — hero card with subtle primary border
         item {
-            val primary   = MaterialTheme.colorScheme.primary
-            val secondary = MaterialTheme.colorScheme.secondary
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(
-                        width = 1.5.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                primary.copy(alpha = 0.8f),
-                                secondary.copy(alpha = 0.6f),
-                                primary.copy(alpha = 0.4f),
-                            )
-                        ),
-                        shape = RoundedCornerShape(16.dp),
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(14.dp),
                     ),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(18.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.AutoAwesome,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = "TL;DR",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -245,6 +233,7 @@ private fun StudyCardContent(card: StudyCardResponse) {
             }
         }
 
+        // Study Design
         item {
             SectionCard(icon = Icons.Filled.Science, title = "Study Design") {
                 Text(
@@ -255,6 +244,7 @@ private fun StudyCardContent(card: StudyCardResponse) {
             }
         }
 
+        // Key Findings
         if (card.keyFindings.isNotEmpty()) {
             item {
                 SectionCard(icon = Icons.Filled.FormatListNumbered, title = "Key Findings") {
@@ -263,14 +253,14 @@ private fun StudyCardContent(card: StudyCardResponse) {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                     modifier = Modifier.size(22.dp),
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Text(
                                             text = "${index + 1}",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.primary,
                                         )
                                     }
@@ -288,6 +278,7 @@ private fun StudyCardContent(card: StudyCardResponse) {
             }
         }
 
+        // Limitations
         item {
             SectionCard(icon = Icons.Filled.Warning, title = "Limitations") {
                 Text(
@@ -298,66 +289,48 @@ private fun StudyCardContent(card: StudyCardResponse) {
             }
         }
 
+        // Source badge
         item { SourceBadge(source = card.source) }
 
+        // Open paper button
         if (card.url.isNotBlank()) {
-            item {
-                val context = LocalContext.current
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TextButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(card.url))
-                            )
-                        },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.OpenInBrowser,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "Open paper",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
-            }
+            item { OpenPaperButton(url = card.url) }
         }
     }
 }
 
-// ── History detail content (partial data from RecentStudyCard) ────────────
+// ── History detail content (partial data from RecentStudyCard) ───────────
 
 @Composable
 private fun HistoryDetailContent(card: RecentStudyCard) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Title
+        // Title card
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = RoundedCornerShape(14.dp),
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                 ),
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         text = card.title ?: card.sourceUrl,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
                         text = formatHistoryDate(card.createdAt),
                         style = MaterialTheme.typography.labelSmall,
@@ -370,43 +343,35 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
         // TL;DR
         if (card.tldr.isNotBlank()) {
             item {
-                val primary   = MaterialTheme.colorScheme.primary
-                val secondary = MaterialTheme.colorScheme.secondary
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(
-                            width = 1.5.dp,
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    primary.copy(alpha = 0.8f),
-                                    secondary.copy(alpha = 0.6f),
-                                    primary.copy(alpha = 0.4f),
-                                )
-                            ),
-                            shape = RoundedCornerShape(16.dp),
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(14.dp),
                         ),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.AutoAwesome,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                             Text(
                                 text = "TL;DR",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
@@ -441,54 +406,29 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
 
         // Open paper button
         if (card.sourceUrl.isNotBlank()) {
-            item {
-                val context = LocalContext.current
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TextButton(
-                        onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(card.sourceUrl))
-                            )
-                        },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.OpenInBrowser,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "Open paper",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                }
-            }
+            item { OpenPaperButton(url = card.sourceUrl) }
         }
 
-        // Limited info notice at the bottom
+        // Limited info notice
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Info,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(13.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "Showing summary from history. Tap \"Open paper\" for the full text.",
+                    text = "Showing summary from history",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
             }
         }
@@ -498,24 +438,55 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
 // ── Shared composables ──────────────────────────────────────────────────
 
 @Composable
+private fun OpenPaperButton(url: String) {
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        FilledTonalButton(
+            onClick = {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                )
+            },
+            shape = RoundedCornerShape(10.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.OpenInBrowser,
+                contentDescription = null,
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Open paper",
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+    }
+}
+
+@Composable
 private fun LoadingContent() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(56.dp),
-            strokeWidth = 3.dp,
+            modifier = Modifier.size(40.dp),
+            strokeWidth = 2.dp,
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(24.dp))
         Text(
             text = "Generating your study card…",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(6.dp))
@@ -525,22 +496,19 @@ private fun LoadingContent() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Filled.AutoAwesome,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
@@ -560,14 +528,20 @@ private fun SectionCard(
     content: @Composable () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline,
+                shape = RoundedCornerShape(14.dp),
+            ),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -575,19 +549,20 @@ private fun SectionCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
+                modifier = Modifier.padding(vertical = 12.dp),
                 thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                color = MaterialTheme.colorScheme.outline,
             )
             content()
         }
@@ -609,11 +584,11 @@ private fun SourceBadge(source: String) {
     ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (isAi) MaterialTheme.colorScheme.secondaryContainer
+            color = if (isAi) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                     else MaterialTheme.colorScheme.surfaceVariant,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -621,13 +596,13 @@ private fun SourceBadge(source: String) {
                     imageVector = Icons.Filled.AutoAwesome,
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
-                    tint = if (isAi) MaterialTheme.colorScheme.onSecondaryContainer
+                    tint = if (isAi) MaterialTheme.colorScheme.primary
                            else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isAi) MaterialTheme.colorScheme.onSecondaryContainer
+                    color = if (isAi) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -647,13 +622,13 @@ private fun ErrorContent(message: String) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.errorContainer,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(56.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Filled.Error,
                     contentDescription = null,
-                    modifier = Modifier.size(30.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -661,13 +636,13 @@ private fun ErrorContent(message: String) {
         Spacer(Modifier.height(20.dp))
         Text(
             text = "Could not generate study card",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
