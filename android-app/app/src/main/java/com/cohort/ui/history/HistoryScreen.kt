@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.Card
@@ -54,8 +55,32 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    StudyCardCollectionScreen(
+        title = "History",
+        subtitle = "Recently generated study cards",
+        emptyTitle = "No cards yet",
+        emptySubtitle = "Generate study cards from the Search tab",
+        emptyIcon = Icons.Filled.History,
+        uiState = uiState,
+        onRetry = viewModel::load,
+        onCardClick = onCardClick,
+        errorTitle = "Could not load history",
+    )
+}
+
+@Composable
+internal fun StudyCardCollectionScreen(
+    title: String,
+    subtitle: String,
+    emptyTitle: String,
+    emptySubtitle: String,
+    emptyIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    uiState: UiState<List<RecentStudyCard>>,
+    onRetry: () -> Unit,
+    onCardClick: (RecentStudyCard) -> Unit,
+    errorTitle: String,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // ── Header ────────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -63,13 +88,13 @@ fun HistoryScreen(
                 .padding(top = 16.dp, bottom = 14.dp),
         ) {
             Text(
-                text = "History",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onBackground,
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "Recently generated study cards",
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -102,7 +127,7 @@ fun HistoryScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            text = "Could not load history",
+                            text = errorTitle,
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -114,7 +139,7 @@ fun HistoryScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         FilledTonalButton(
-                            onClick = { viewModel.load() },
+                            onClick = onRetry,
                             shape = RoundedCornerShape(10.dp),
                         ) {
                             Text("Retry", style = MaterialTheme.typography.labelLarge)
@@ -142,7 +167,7 @@ fun HistoryScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Filled.History,
+                                        imageVector = emptyIcon,
                                         contentDescription = null,
                                         modifier = Modifier.size(22.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -151,12 +176,12 @@ fun HistoryScreen(
                             }
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = "No cards yet",
+                                text = emptyTitle,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
                             Text(
-                                text = "Generate study cards from the Search tab",
+                                text = emptySubtitle,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -171,7 +196,7 @@ fun HistoryScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(cards) { card ->
-                            RecentCardItem(
+                            StudyCardListItem(
                                 card = card,
                                 onClick = { onCardClick(card) },
                             )
@@ -184,7 +209,7 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun RecentCardItem(
+internal fun StudyCardListItem(
     card: RecentStudyCard,
     onClick: () -> Unit,
 ) {
@@ -228,7 +253,26 @@ private fun RecentCardItem(
                 )
             }
 
-            // TL;DR preview
+            if (card.isSaved) {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Bookmark,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "Saved",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
             if (card.tldr.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -282,5 +326,5 @@ private fun RecentCardItem(
     }
 }
 
-private fun formatDate(isoString: String): String =
+internal fun formatDate(isoString: String): String =
     if (isoString.length >= 10) isoString.substring(0, 10) else isoString

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
@@ -42,6 +43,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -49,6 +52,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,11 +95,30 @@ fun StudyCardScreen(
     viewModel: StudyCardViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val saveUiState by viewModel.saveUiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(doi) { viewModel.load(doi) }
+    LaunchedEffect(saveUiState.errorMessage) {
+        val message = saveUiState.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearSaveError()
+    }
+
+    val currentCard = (uiState as? UiState.Success)?.data
+    val saveUrl = currentCard?.url.orEmpty()
 
     Scaffold(
-        topBar = { StudyCardTopBar(onBack = onBack) },
+        topBar = {
+            StudyCardTopBar(
+                onBack = onBack,
+                isSaved = saveUiState.isSaved,
+                isSaving = saveUiState.isSaving,
+                canSave = saveUrl.isNotBlank(),
+                onSaveClick = { viewModel.toggleSaved(saveUrl) },
+            )
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -123,16 +146,35 @@ fun StudyCardDetailScreen(
     viewModel: StudyCardViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val saveUiState by viewModel.saveUiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(card.doi, card.sourceUrl) {
+        viewModel.setInitialSavedState(card.isSaved)
         if (!card.doi.isNullOrBlank()) viewModel.load(card.doi)
         else if (card.sourceUrl.isNotBlank()) viewModel.loadByUrl(card.sourceUrl)
     }
+    LaunchedEffect(saveUiState.errorMessage) {
+        val message = saveUiState.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearSaveError()
+    }
 
     val showFullCard = uiState is UiState.Success
+    val currentCard = (uiState as? UiState.Success)?.data
+    val saveUrl = currentCard?.url?.takeIf { it.isNotBlank() } ?: card.sourceUrl
 
     Scaffold(
-        topBar = { StudyCardTopBar(onBack = onBack) },
+        topBar = {
+            StudyCardTopBar(
+                onBack = onBack,
+                isSaved = saveUiState.isSaved,
+                isSaving = saveUiState.isSaving,
+                canSave = saveUrl.isNotBlank(),
+                onSaveClick = { viewModel.toggleSaved(saveUrl) },
+            )
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -164,7 +206,13 @@ fun StudyCardDetailScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StudyCardTopBar(onBack: () -> Unit) {
+private fun StudyCardTopBar(
+    onBack: () -> Unit,
+    isSaved: Boolean,
+    isSaving: Boolean,
+    canSave: Boolean,
+    onSaveClick: () -> Unit,
+) {
     TopAppBar(
         title = {
             Text(
@@ -179,10 +227,13 @@ private fun StudyCardTopBar(onBack: () -> Unit) {
             }
         },
         actions = {
-            IconButton(onClick = { /* bookmark – no-op for now */ }) {
+            IconButton(
+                onClick = onSaveClick,
+                enabled = canSave && !isSaving,
+            ) {
                 Icon(
-                    Icons.Filled.BookmarkBorder,
-                    contentDescription = "Bookmark",
+                    imageVector = if (isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                    contentDescription = if (isSaved) "Saved" else "Save",
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }

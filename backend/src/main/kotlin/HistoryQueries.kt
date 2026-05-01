@@ -11,6 +11,7 @@ data class RecentStudyCard(
     val sourceUrl: String,
     val tldr: String,
     val studyDesign: String,
+    val isSaved: Boolean,
     val doi: String?,
     val title: String?,
 )
@@ -34,6 +35,7 @@ object HistoryQueries {
                 sc.source_url,
                 sc.tldr,
                 sc.study_design,
+                sc.is_saved,
                 p.doi,
                 p.title
             FROM study_cards sc
@@ -53,11 +55,50 @@ object HistoryQueries {
                         sourceUrl = rs.getString("source_url"),
                         tldr = rs.getString("tldr"),
                         studyDesign = rs.getString("study_design"),
+                        isSaved = rs.getBoolean("is_saved"),
                         doi = rs.getString("doi"),
                         title = rs.getString("title"),
                     )
                 }
                 results
+            }
+        }
+    }
+
+    suspend fun getSavedStudyCards(): List<RecentStudyCard> = withContext(Dispatchers.IO) {
+        val sql = """
+            SELECT DISTINCT ON (sc.source_url)
+                sc.created_at,
+                sc.generation_source,
+                sc.source_url,
+                sc.tldr,
+                sc.study_design,
+                sc.is_saved,
+                p.doi,
+                p.title
+            FROM study_cards sc
+            LEFT JOIN papers p ON p.id = sc.paper_id
+            WHERE sc.is_saved = TRUE
+            ORDER BY sc.source_url, sc.created_at DESC
+        """.trimIndent()
+
+        Database.connect().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                val rs = stmt.executeQuery()
+                val results = mutableListOf<RecentStudyCard>()
+                while (rs.next()) {
+                    results += RecentStudyCard(
+                        createdAt = rs.getTimestamp("created_at").toInstant().toString(),
+                        generationSource = rs.getString("generation_source"),
+                        sourceUrl = rs.getString("source_url"),
+                        tldr = rs.getString("tldr"),
+                        studyDesign = rs.getString("study_design"),
+                        isSaved = rs.getBoolean("is_saved"),
+                        doi = rs.getString("doi"),
+                        title = rs.getString("title"),
+                    )
+                }
+                results.sortedByDescending { it.createdAt }
             }
         }
     }

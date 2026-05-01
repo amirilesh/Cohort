@@ -26,6 +26,7 @@ data class StudyCardResponse(
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
+    val isSaved: Boolean = false,
     val reason: String? = null,
 )
 

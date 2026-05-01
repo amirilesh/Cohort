@@ -61,6 +61,13 @@ CREATE TABLE IF NOT EXISTS study_cards (
 CREATE INDEX IF NOT EXISTS study_cards_paper_id_idx
     ON study_cards (paper_id);
 
+ALTER TABLE study_cards
+    ADD COLUMN IF NOT EXISTS is_saved BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS study_cards_saved_created_at_idx
+    ON study_cards (created_at DESC)
+    WHERE is_saved = TRUE;
+
 -- Migration: update existing constraint for databases already provisioned
 ALTER TABLE study_cards
 DROP CONSTRAINT IF EXISTS study_cards_generation_source_check;
