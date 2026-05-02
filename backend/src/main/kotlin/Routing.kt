@@ -97,19 +97,30 @@ fun Application.configureRouting() {
             get("/studycard") {
                 val doi = call.request.queryParameters["doi"]
                 val url = call.request.queryParameters["url"]
+                val normalizedDoi = doi?.normalizeDoi()
 
-                if (!doi.isNullOrBlank()) {
-                    if (doi.length > 200) {
+                if (url != null && !url.isValidHttpUrl()) {
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "invalid_url"))
+                    return@get
+                }
+
+                if (doi != null && normalizedDoi.isNullOrBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "invalid_doi"))
+                    return@get
+                }
+
+                if (!normalizedDoi.isNullOrBlank()) {
+                    if (normalizedDoi.length > 200) {
                         call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "doi_too_long"))
                         return@get
                     }
-                    val cached = StudyCardPersistence.findByDoi(doi)
+                    val cached = StudyCardPersistence.findByDoi(normalizedDoi)
                     if (cached != null) {
                         call.respond(cached)
                         return@get
                     }
-                    val result = StudyCardService.generateFromDoi(doi)
-                    if (result.success) StudyCardPersistence.save(result, doi)
+                    val result = StudyCardService.generateFromDoi(normalizedDoi)
+                    if (result.success) StudyCardPersistence.save(result, normalizedDoi)
                     call.respond(result)
                     return@get
                 }
@@ -225,5 +236,23 @@ private fun checkOpenAlex(): String {
         if (response.statusCode() in 200..299) "up" else "down"
     } catch (_: Exception) {
         "down"
+    }
+}
+
+private fun String.normalizeDoi(): String =
+    trim()
+        .removePrefix("https://doi.org/")
+        .removePrefix("http://doi.org/")
+        .removePrefix("doi:")
+        .trim()
+
+private fun String.isValidHttpUrl(): Boolean {
+    if (isBlank() || !(startsWith("http://") || startsWith("https://"))) return false
+
+    return try {
+        val uri = URI(this)
+        uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
+    } catch (_: Exception) {
+        false
     }
 }
