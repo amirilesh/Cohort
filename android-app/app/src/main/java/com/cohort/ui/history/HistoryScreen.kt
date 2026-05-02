@@ -22,7 +22,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.Card
@@ -67,10 +69,10 @@ private data class SourceStyle(
 )
 
 private fun sourceStyle(generationSource: String): SourceStyle = when (generationSource.lowercase()) {
-    "llm"          -> SourceStyle(Purple, PurpleDim, "FULL TEXT")
-    "llm_abstract" -> SourceStyle(Blue,   BlueDim,   "ABSTRACT ONLY")
-    "fallback"     -> SourceStyle(Orange, OrangeDim, "METADATA ONLY")
-    else           -> SourceStyle(Purple, PurpleDim, "FULL TEXT")
+    "llm"          -> SourceStyle(Purple, PurpleDim, "Full text")
+    "llm_abstract" -> SourceStyle(Blue,   BlueDim,   "Abstract only")
+    "fallback"     -> SourceStyle(Orange, OrangeDim, "Metadata only")
+    else           -> SourceStyle(Purple, PurpleDim, "Full text")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -197,7 +199,13 @@ internal fun StudyCardCollectionScreen(
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        shape = RoundedCornerShape(14.dp),
+                                    ),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
@@ -259,7 +267,7 @@ internal fun StudyCardListItem(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = style.accent.copy(alpha = 0.18f),
+                color = style.accent.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(20.dp),
             )
             .clip(RoundedCornerShape(20.dp))
@@ -273,7 +281,7 @@ internal fun StudyCardListItem(
             // ── Colored left accent bar ──────────────────────────────────
             Box(
                 modifier = Modifier
-                    .width(4.dp)
+                    .width(3.dp)
                     .fillMaxHeight()
                     .background(style.accent),
             )
@@ -302,9 +310,12 @@ internal fun StudyCardListItem(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.History,
+                                imageVector = when (card.generationSource.lowercase()) {
+                                    "llm", "llm_abstract" -> Icons.Filled.AutoAwesome
+                                    else                  -> Icons.Filled.Description
+                                },
                                 contentDescription = null,
-                                modifier = Modifier.size(11.dp),
+                                modifier = Modifier.size(12.dp),
                                 tint = style.accent,
                             )
                             Text(
@@ -312,7 +323,6 @@ internal fun StudyCardListItem(
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = style.accent,
-                                letterSpacing = 0.5.sp,
                             )
                         }
                     }
@@ -387,7 +397,7 @@ internal fun StudyCardListItem(
                     if (card.sourceUrl.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = style.accent.copy(alpha = 0.12f),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable {
@@ -405,13 +415,13 @@ internal fun StudyCardListItem(
                                     imageVector = Icons.Filled.OpenInBrowser,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
-                                    tint = style.accent,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Text(
                                     text = "Open paper",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = style.accent,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }

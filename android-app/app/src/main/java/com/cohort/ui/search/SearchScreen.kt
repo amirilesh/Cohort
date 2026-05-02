@@ -404,19 +404,20 @@ private fun PaperCard(
                         )
                     }
                     if ((paper.citedByCount ?: 0) > 0) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(3.dp))
                         Box(
                             modifier = Modifier
                                 .background(
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(20.dp),
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = "Cited ${paper.citedByCount}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
@@ -437,13 +438,13 @@ private fun PaperCard(
                     Icon(
                         imageVector = Icons.Filled.Person,
                         contentDescription = null,
-                        modifier = Modifier.size(11.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        modifier = Modifier.size(12.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
                     )
                     Text(
                         text = authorsLabel,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -452,7 +453,7 @@ private fun PaperCard(
 
             // ── Abstract ──────────────────────────────────────────────────
             if (!paper.abstractText.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     text = paper.abstractText,
                     style = MaterialTheme.typography.bodySmall,

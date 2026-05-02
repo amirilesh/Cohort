@@ -28,9 +28,9 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Description
@@ -270,7 +270,6 @@ private fun StudyCardContent(card: StudyCardResponse) {
                 title = "Summarized Study",
                 chip = "AI Summary",
                 subtitle = "AI-generated summary of key findings\nand insights from this research.",
-                showChevron = true,
             ) {
                 Text(
                     text = card.tldr,
@@ -520,7 +519,6 @@ private fun SectionCard(
     title: String,
     chip: String? = null,
     subtitle: String? = null,
-    showChevron: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Card(
@@ -570,7 +568,6 @@ private fun SectionCard(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = accent,
-                            fontSize = 15.sp,
                         )
                         // "AI Summary" chip
                         if (chip != null) {
@@ -602,18 +599,9 @@ private fun SectionCard(
                     }
                 }
 
-                // Chevron (for expandable sections)
-                if (showChevron) {
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        tint = accent,
-                    )
-                }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // ── Body content ────────────────────────────────────────────
             content()
@@ -663,14 +651,13 @@ private fun OpenPaperCard(url: String) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Open Full Paper",
+                    text = "Read full paper",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Cyan,
-                    fontSize = 15.sp,
                 )
                 Text(
-                    text = "View original research",
+                    text = try { Uri.parse(url).host.orEmpty() } catch (_: Exception) { "" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -714,7 +701,8 @@ private fun SourceBadge(source: String) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.AutoAwesome,
+                    imageVector = if (isAi) Icons.Filled.AutoAwesome
+                                  else Icons.Filled.Construction,
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
                     tint = if (isAi) Purple else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -763,6 +751,11 @@ private fun LoadingContent() {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = CardBg,
+            modifier = Modifier.border(
+                width = 1.dp,
+                color = Purple.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(12.dp),
+            ),
         ) {
             Row(
                 modifier = Modifier.padding(14.dp),
