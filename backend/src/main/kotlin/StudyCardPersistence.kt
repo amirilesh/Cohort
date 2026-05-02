@@ -29,7 +29,7 @@ object StudyCardPersistence {
                 conn.prepareStatement(
                     """
                     SELECT sc.source_url, sc.tldr, sc.study_design, sc.limitations,
-                           sc.key_findings::text AS key_findings, sc.generation_source
+                           sc.key_findings::text AS key_findings, sc.generation_source, sc.is_saved
                     FROM study_cards sc
                     JOIN papers p ON p.id = sc.paper_id
                     WHERE LOWER(p.doi) = ?
@@ -56,7 +56,7 @@ object StudyCardPersistence {
                 conn.prepareStatement(
                     """
                     SELECT source_url, tldr, study_design, limitations,
-                           key_findings::text AS key_findings, generation_source
+                           key_findings::text AS key_findings, generation_source, is_saved
                     FROM study_cards
                     WHERE source_url = ?
                     ORDER BY created_at DESC
@@ -96,6 +96,7 @@ object StudyCardPersistence {
             studyDesign = rs.getString("study_design"),
             keyFindings = keyFindings,
             limitations = rs.getString("limitations"),
+            isSaved = rs.getBoolean("is_saved"),
         )
     }
 
@@ -108,6 +109,14 @@ object StudyCardPersistence {
         } catch (e: Exception) {
             log.error("failed to save study card", e)
         }
+    }
+
+    suspend fun markSaved(url: String): Boolean = withContext(Dispatchers.IO) {
+        updateSavedState(url = url, isSaved = true)
+    }
+
+    suspend fun unmarkSaved(url: String): Boolean = withContext(Dispatchers.IO) {
+        updateSavedState(url = url, isSaved = false)
     }
 
     private fun ensurePaperByDoi(conn: Connection, doi: String): UUID? {
@@ -150,6 +159,27 @@ object StudyCardPersistence {
             stmt.setObject(6, keyFindingsJson)
             stmt.setString(7, card.source)
             stmt.executeUpdate()
+        }
+    }
+
+    private fun updateSavedState(url: String, isSaved: Boolean): Boolean {
+        return try {
+            Database.connect().use { conn ->
+                conn.prepareStatement(
+                    """
+                    UPDATE study_cards
+                    SET is_saved = ?
+                    WHERE source_url = ?
+                    """.trimIndent()
+                ).use { stmt ->
+                    stmt.setBoolean(1, isSaved)
+                    stmt.setString(2, url)
+                    stmt.executeUpdate() > 0
+                }
+            }
+        } catch (e: Exception) {
+            log.error("failed to update saved state url={} isSaved={}", url, isSaved, e)
+            false
         }
     }
 }

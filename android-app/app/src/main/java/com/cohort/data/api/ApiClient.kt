@@ -1,5 +1,6 @@
 package com.cohort.data.api
 
+import com.cohort.BuildConfig
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,14 +10,10 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    // Emulator: 10.0.2.2 maps to host machine localhost
-    // Real device: replace with LAN IP or deployed URL
-    private const val BASE_URL = "http://10.0.2.2:8080/"
-
     private val json = Json { ignoreUnknownKeys = true }
 
     val api: CohortApi = Retrofit.Builder()
-        .baseUrl(BASE_URL)
+        .baseUrl(BuildConfig.BACKEND_URL)
         .client(
             OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)

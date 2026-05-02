@@ -19,6 +19,8 @@ data class PaperPreview(
     val doi: String? = null,
     @SerialName("abstractText") val abstractText: String? = null,
     val oaUrl: String? = null,
+    val authors: List<String> = emptyList(),
+    val citedByCount: Int? = null,
 )
 
 @Serializable
@@ -31,7 +33,11 @@ data class StudyCardResponse(
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
+    val isSaved: Boolean = false,
     val reason: String? = null,
+    val title: String? = null,
+    val year: Int? = null,
+    val doi: String? = null,
 )
 
 @Serializable
@@ -41,6 +47,7 @@ data class RecentStudyCard(
     val sourceUrl: String,
     val tldr: String,
     val studyDesign: String,
+    val isSaved: Boolean = false,
     val doi: String? = null,
     val title: String? = null,
 )

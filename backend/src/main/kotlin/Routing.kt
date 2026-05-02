@@ -128,12 +128,6 @@ fun Application.configureRouting() {
                     call.respond(cached)
                     return@get
                 }
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    ApiErrorResponse(reason = "missing_doi_or_url")
-                )
-                return@get
-
                 val result = StudyCardService.generate(url)
                 if (result.success) StudyCardPersistence.save(result, doi = null)
                 call.respond(result)
@@ -142,6 +136,48 @@ fun Application.configureRouting() {
 
         get("/studycards/recent") {
             call.respond(HistoryQueries.getRecentStudyCards())
+        }
+
+        post("/studycards/save") {
+            val url = call.request.queryParameters["url"]
+            if (url.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_url"))
+                return@post
+            }
+            if (url.length > 2000) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
+                return@post
+            }
+
+            if (!StudyCardPersistence.markSaved(url)) {
+                call.respond(HttpStatusCode.NotFound, ApiErrorResponse(reason = "study_card_not_found"))
+                return@post
+            }
+
+            call.respond(HttpStatusCode.OK)
+        }
+
+        delete("/studycards/save") {
+            val url = call.request.queryParameters["url"]
+            if (url.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_url"))
+                return@delete
+            }
+            if (url.length > 2000) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
+                return@delete
+            }
+
+            if (!StudyCardPersistence.unmarkSaved(url)) {
+                call.respond(HttpStatusCode.NotFound, ApiErrorResponse(reason = "study_card_not_found"))
+                return@delete
+            }
+
+            call.respond(HttpStatusCode.OK)
+        }
+
+        get("/studycards/saved") {
+            call.respond(HistoryQueries.getSavedStudyCards())
         }
 
         get("/search/history") {

@@ -1,8 +1,20 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"
 }
+
+// Read optional override from local.properties (git-ignored).
+// Developer sets:  BACKEND_URL=http://192.168.1.42:8080/
+// If absent, falls back to the emulator alias.
+val localProperties = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) props.load(f.inputStream())
+}
+val backendUrl: String =
+    localProperties.getProperty("BACKEND_URL") ?: "http://10.0.2.2:8080/"
+
 android {
     namespace = "com.cohort"
     compileSdk {
@@ -19,6 +31,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BACKEND_URL", "\"$backendUrl\"")
     }
 
     buildTypes {
@@ -36,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

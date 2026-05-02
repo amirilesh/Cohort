@@ -19,6 +19,9 @@ class SearchViewModel : ViewModel() {
     private val _isLoadingMore = MutableStateFlow(false)
     val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
 
+    private val _lastSearchQuery = MutableStateFlow("")
+    val lastSearchQuery: StateFlow<String> = _lastSearchQuery.asStateFlow()
+
     private var currentQuery = ""
     private var currentPage = 0
     private var totalCount = 0
@@ -32,7 +35,9 @@ class SearchViewModel : ViewModel() {
 
     fun search(query: String) {
         if (query.isBlank()) return
-        currentQuery = query.trim()
+        val trimmedQuery = query.trim()
+        _lastSearchQuery.value = trimmedQuery
+        currentQuery = trimmedQuery
         currentPage = 0
         totalCount = 0
         accumulated.clear()
@@ -41,6 +46,10 @@ class SearchViewModel : ViewModel() {
             _uiState.value = UiState.Loading
             fetchPage()
         }
+    }
+
+    fun retryLastSearch() {
+        search(_lastSearchQuery.value)
     }
 
     fun loadNextPage() {

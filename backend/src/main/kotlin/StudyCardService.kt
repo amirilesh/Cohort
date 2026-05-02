@@ -22,12 +22,16 @@ data class StudyCardResponse(
     val url: String,
     val success: Boolean,
     val source: String = "",
-    val sourceType: String = "FULL_TEXT",  // FULL_TEXT | ABSTRACT_ONLY | METADATA_ONLY
+    val sourceType: String = "FULL_TEXT",
     val tldr: String = "",
     val studyDesign: String = "",
     val keyFindings: List<String> = emptyList(),
     val limitations: String = "",
+    val isSaved: Boolean = false,
     val reason: String? = null,
+    val title: String? = null,
+    val year: Int? = null,
+    val doi: String? = null,
 )
 
 object StudyCardService {
@@ -48,7 +52,6 @@ object StudyCardService {
             return StudyCardResponse(
                 url = url,
                 success = false,
-                sourceType = "METADATA_ONLY",
                 reason = pdfText.reason ?: "pdf_download_failed",
             )
         }
@@ -65,26 +68,68 @@ object StudyCardService {
     }
 
     fun generateFromDoi(doi: String): StudyCardResponse {
+        val paper = OpenAlexService.getPaperByDoi(doi)
         val candidates = OpenAlexService.getPdfCandidatesForDoi(doi)
-            ?: return StudyCardResponse(url = "", success = false, sourceType = "METADATA_ONLY", reason = "openalex_not_found")
+            ?: return StudyCardResponse(url = "", success = false, reason = "openalex_not_found")
 
-        if (candidates.isNotEmpty()) {
-            log.info("doi={} pdf_candidates={}", doi, candidates.size)
-
-            for (candidate in candidates) {
-                val result = generate(candidate)
-                if (result.success) {
-                    log.info("doi={} pdf_success url={}", doi, candidate)
-                    return result
-                }
-                log.info("doi={} pdf_failed url={} reason={}", doi, candidate, result.reason)
-            }
-
-            log.warn("doi={} all_candidates_failed count={}", doi, candidates.size)
+        if (candidates.isEmpty()) {
+            log.info("doi={} no_pdf_candidates, trying abstract fallback", doi)
+            return generateFromAbstractOrMetadata(doi, paper, "no_open_access_pdf")
         }
 
-        val paper = OpenAlexService.getPaperByDoi(doi)
-        return generateFromAbstractOrMetadata(doi, paper)
+        log.info("doi={} pdf_candidates={}", doi, candidates.size)
+
+        for (candidate in candidates) {
+            val result = generate(candidate)
+            if (result.success) {
+                log.info("doi={} pdf_success url={}", doi, candidate)
+                return result
+            }
+            log.info("doi={} pdf_failed url={} reason={}", doi, candidate, result.reason)
+        }
+
+        log.warn("doi={} all_candidates_failed count={}, trying abstract fallback", doi, candidates.size)
+        return generateFromAbstractOrMetadata(doi, paper, "no_accessible_pdf")
+    }
+
+    private fun generateFromAbstractOrMetadata(doi: String, paper: PaperPreview?, reason: String): StudyCardResponse {
+        log.info(
+            "abstract_fallback doi={} title={} year={} abstract_len={}",
+            doi,
+            paper?.title,
+            paper?.year,
+            paper?.abstractText?.length ?: 0
+        )
+        val doiUrl = "https://doi.org/${doi.trim().removePrefix("https://doi.org/").removePrefix("http://doi.org/").removePrefix("doi:").trim()}"
+        val url = paper?.oaUrl ?: doiUrl
+
+        val abstractText = paper?.abstractText
+        if (!abstractText.isNullOrBlank()) {
+            log.info("doi={} generating from abstract ({} chars)", doi, abstractText.length)
+            val llmResult = generateFromExtractedText(url, abstractText)
+            if (llmResult != null && llmResult.success) {
+                return llmResult.copy(
+                    source = "llm_abstract",
+                    sourceType = "ABSTRACT_ONLY",
+                    title = paper.title,
+                    year = paper.year,
+                    doi = paper.doi ?: doiUrl,
+                )
+            }
+            log.info("doi={} abstract LLM failed, returning metadata only", doi)
+        } else {
+            log.info("doi={} no abstract available, returning metadata only", doi)
+        }
+
+        return StudyCardResponse(
+            url = url,
+            success = false,
+            sourceType = "METADATA_ONLY",
+            reason = reason,
+            title = paper?.title,
+            year = paper?.year,
+            doi = paper?.doi ?: doiUrl,
+        )
     }
 
     private fun generateFromExtractedText(url: String, extractedText: String): StudyCardResponse? {
@@ -163,7 +208,6 @@ object StudyCardService {
                 url = url,
                 success = true,
                 source = "llm",
-                sourceType = "FULL_TEXT",
                 tldr = studyCardJson.stringValue("tldr"),
                 studyDesign = studyCardJson.stringValue("studyDesign"),
                 keyFindings = studyCardJson.stringList("keyFindings"),
@@ -194,122 +238,11 @@ object StudyCardService {
             url = url,
             success = true,
             source = "fallback",
-            sourceType = "FULL_TEXT",
             tldr = tldr,
             studyDesign = detectStudyDesign(fallbackText),
             keyFindings = extractFindings(findingText.ifBlank { fallbackText }),
             limitations = FALLBACK_LIMITATIONS,
         )
-    }
-
-    private fun generateFromAbstractOrMetadata(doi: String, paper: PaperPreview?): StudyCardResponse {
-        val abstract = paper?.abstractText
-        if (abstract.isNullOrBlank()) {
-            log.warn("doi={} no_abstract_available", doi)
-            return StudyCardResponse(
-                url = paper?.oaUrl ?: "",
-                success = false,
-                sourceType = "METADATA_ONLY",
-                reason = "no_pdf_or_abstract",
-            )
-        }
-
-        log.info("doi={} generating_from_abstract", doi)
-        val url = paper.oaUrl ?: ""
-        val llmResult = generateFromAbstract(url, abstract)
-
-        if (llmResult != null && llmResult.success) {
-            return llmResult
-        }
-
-        log.warn("doi={} abstract_llm_failed", doi)
-        return StudyCardResponse(
-            url = url,
-            success = false,
-            sourceType = "METADATA_ONLY",
-            reason = "no_pdf_or_abstract",
-        )
-    }
-
-    private fun generateFromAbstract(url: String, abstract: String): StudyCardResponse? {
-        val apiKey = System.getenv("OPENAI_API_KEY")
-        if (apiKey.isNullOrBlank()) return null
-
-        val model = System.getenv("OPENAI_MODEL") ?: DEFAULT_MODEL
-        val requestBody = buildAbstractRequestBody(model, abstract)
-
-        return try {
-            val client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .build()
-
-            val request = HttpRequest.newBuilder()
-                .uri(URI("https://api.openai.com/v1/chat/completions"))
-                .timeout(Duration.ofSeconds(60))
-                .header("Authorization", "Bearer $apiKey")
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build()
-
-            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-
-            if (response.statusCode() !in 200..299) {
-                return StudyCardResponse(url = url, success = false, sourceType = "ABSTRACT_ONLY", reason = "llm_generation_failed")
-            }
-
-            parseAbstractStudyCard(url, response.body())
-                ?: StudyCardResponse(url = url, success = false, sourceType = "ABSTRACT_ONLY", reason = "llm_generation_failed")
-        } catch (_: Exception) {
-            StudyCardResponse(url = url, success = false, sourceType = "ABSTRACT_ONLY", reason = "llm_generation_failed")
-        }
-    }
-
-    private fun buildAbstractRequestBody(model: String, abstract: String): String {
-        val payload = OpenAiChatRequest(
-            model = model,
-            temperature = 0.0,
-            responseFormat = ResponseFormat(type = "json_object"),
-            messages = listOf(
-                ChatMessage(
-                    role = "system",
-                    content =
-                        "You create concise study cards from research paper abstracts. " +
-                                "Explain everything in very simple language, like to a beginner. " +
-                                "Avoid scientific jargon. Use short sentences. " +
-                                "Only use information present in the abstract. " +
-                                "Return valid JSON with exactly these fields: " +
-                                "tldr, studyDesign, keyFindings, limitations. " +
-                                "keyFindings must be an array of short, simple bullet points. " +
-                                "For limitations, note that this summary is based on the abstract only.",
-                ),
-                ChatMessage(
-                    role = "user",
-                    content = "Create a study card from this paper abstract:\n\n$abstract",
-                ),
-            ),
-        )
-        return json.encodeToString(OpenAiChatRequest.serializer(), payload)
-    }
-
-    private fun parseAbstractStudyCard(url: String, responseBody: String): StudyCardResponse? {
-        return try {
-            val responseJson = json.parseToJsonElement(responseBody).jsonObject
-            val content = responseJson.extractMessageContent() ?: return null
-            val studyCardJson = json.parseToJsonElement(content).jsonObject
-
-            StudyCardResponse(
-                url = url,
-                success = true,
-                source = "llm_abstract",
-                sourceType = "ABSTRACT_ONLY",
-                tldr = studyCardJson.stringValue("tldr"),
-                studyDesign = studyCardJson.stringValue("studyDesign"),
-                keyFindings = studyCardJson.stringList("keyFindings"),
-                limitations = studyCardJson.stringValue("limitations"),
-            )
-        } catch (_: Exception) {
-            null
-        }
     }
 
     private fun extractUsefulSections(text: String): Map<String, String> {
