@@ -82,10 +82,16 @@ object StudyCardPersistence {
         } catch (_: Exception) {
             emptyList()
         }
+        val generationSource = rs.getString("generation_source")
+        val sourceType = when (generationSource) {
+            "llm_abstract" -> "ABSTRACT_ONLY"
+            else -> "FULL_TEXT"
+        }
         return StudyCardResponse(
             url = rs.getString("source_url"),
             success = true,
-            source = rs.getString("generation_source"),
+            source = generationSource,
+            sourceType = sourceType,
             tldr = rs.getString("tldr"),
             studyDesign = rs.getString("study_design"),
             keyFindings = keyFindings,
