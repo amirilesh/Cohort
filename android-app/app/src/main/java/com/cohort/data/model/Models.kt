@@ -19,6 +19,8 @@ data class PaperPreview(
     val doi: String? = null,
     @SerialName("abstractText") val abstractText: String? = null,
     val oaUrl: String? = null,
+    val authors: List<String> = emptyList(),
+    val citedByCount: Int? = null,
 )
 
 @Serializable

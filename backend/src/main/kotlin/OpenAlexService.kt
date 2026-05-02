@@ -50,6 +50,8 @@ object OpenAlexService {
                     isOpenAccess = work.openAccess?.isOpenAccess,
                     oaStatus = work.openAccess?.oaStatus,
                     oaUrl = work.bestOaLocation?.pdfUrl,
+                    authors = work.authorships.mapNotNull { it.author?.displayName?.substringAfterLast(" ") }.filter { it.isNotBlank() },
+                    citedByCount = work.citedByCount,
                 )
             }
             .filter { it.isOpenAccess == true && it.oaUrl != null }
@@ -95,6 +97,8 @@ object OpenAlexService {
             isOpenAccess = work.openAccess?.isOpenAccess,
             oaStatus = work.openAccess?.oaStatus,
             oaUrl = work.bestOaLocation?.pdfUrl,
+            authors = work.authorships.mapNotNull { it.author?.displayName?.substringAfterLast(" ") }.filter { it.isNotBlank() },
+            citedByCount = work.citedByCount,
         )
     }
 
@@ -158,7 +162,9 @@ data class PaperPreview(
     val abstractText: String?,
     val isOpenAccess: Boolean?,
     val oaStatus: String?,
-    val oaUrl: String?
+    val oaUrl: String?,
+    val authors: List<String> = emptyList(),
+    val citedByCount: Int? = null,
 )
 
 @Serializable
@@ -182,6 +188,18 @@ private data class OpenAlexWork(
     @SerialName("best_oa_location") val bestOaLocation: OaLocation? = null,
     @SerialName("primary_location") val primaryLocation: OaLocation? = null,
     @SerialName("locations") val locations: List<OaLocation> = emptyList(),
+    @SerialName("authorships") val authorships: List<Authorship> = emptyList(),
+    @SerialName("cited_by_count") val citedByCount: Int? = null,
+)
+
+@Serializable
+private data class Authorship(
+    val author: Author? = null,
+)
+
+@Serializable
+private data class Author(
+    @SerialName("display_name") val displayName: String? = null,
 )
 
 @Serializable

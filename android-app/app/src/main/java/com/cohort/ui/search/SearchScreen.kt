@@ -1,5 +1,6 @@
 package com.cohort.ui.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
@@ -64,7 +66,6 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
-    val lastSearchQuery by viewModel.lastSearchQuery.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -155,11 +156,7 @@ fun SearchScreen(
         when (val state = uiState) {
             is UiState.Idle    -> EmptyState()
             is UiState.Loading -> SearchingState()
-            is UiState.Error   -> ErrorState(
-                message = state.message,
-                canRetry = lastSearchQuery.isNotBlank(),
-                onRetry = viewModel::retryLastSearch,
-            )
+            is UiState.Error   -> ErrorState(message = state.message)
             is UiState.Success -> {
                 val results = state.data.results
                 if (results.isEmpty()) {
@@ -340,11 +337,7 @@ private fun SearchingState() {
 }
 
 @Composable
-private fun ErrorState(
-    message: String,
-    canRetry: Boolean,
-    onRetry: () -> Unit,
-) {
+private fun ErrorState(message: String) {
     Box(
         modifier = Modifier.fillMaxSize().padding(40.dp),
         contentAlignment = Alignment.Center,
@@ -364,18 +357,6 @@ private fun ErrorState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            if (canRetry) {
-                FilledTonalButton(
-                    onClick = onRetry,
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = "Retry",
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
         }
     }
 }
@@ -398,6 +379,8 @@ private fun PaperCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+
+            // ── Title row (year + citation badge on the right) ────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -410,17 +393,64 @@ private fun PaperCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                if (paper.year != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (paper.year != null) {
+                        Text(
+                            text = "${paper.year}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if ((paper.citedByCount ?: 0) > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(6.dp),
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = "Cited ${paper.citedByCount}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Authors line ──────────────────────────────────────────────
+            if (paper.authors.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                val authorsLabel = when {
+                    paper.authors.size == 1 -> paper.authors[0]
+                    else                    -> "${paper.authors[0]} et al."
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(11.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    )
                     Text(
-                        text = "${paper.year}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = authorsLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
 
+            // ── Abstract ──────────────────────────────────────────────────
             if (!paper.abstractText.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -432,6 +462,7 @@ private fun PaperCard(
                 )
             }
 
+            // ── Action row ────────────────────────────────────────────────
             if (paper.doi != null) {
                 Spacer(Modifier.height(12.dp))
                 Row(
