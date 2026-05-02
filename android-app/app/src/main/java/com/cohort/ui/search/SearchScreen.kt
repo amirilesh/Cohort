@@ -64,6 +64,7 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val lastSearchQuery by viewModel.lastSearchQuery.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -154,7 +155,11 @@ fun SearchScreen(
         when (val state = uiState) {
             is UiState.Idle    -> EmptyState()
             is UiState.Loading -> SearchingState()
-            is UiState.Error   -> ErrorState(message = state.message)
+            is UiState.Error   -> ErrorState(
+                message = state.message,
+                canRetry = lastSearchQuery.isNotBlank(),
+                onRetry = viewModel::retryLastSearch,
+            )
             is UiState.Success -> {
                 val results = state.data.results
                 if (results.isEmpty()) {
@@ -335,7 +340,11 @@ private fun SearchingState() {
 }
 
 @Composable
-private fun ErrorState(message: String) {
+private fun ErrorState(
+    message: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+) {
     Box(
         modifier = Modifier.fillMaxSize().padding(40.dp),
         contentAlignment = Alignment.Center,
@@ -355,6 +364,18 @@ private fun ErrorState(message: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            if (canRetry) {
+                FilledTonalButton(
+                    onClick = onRetry,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = "Retry",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
         }
     }
 }
