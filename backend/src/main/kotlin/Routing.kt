@@ -128,12 +128,6 @@ fun Application.configureRouting() {
                     call.respond(cached)
                     return@get
                 }
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    ApiErrorResponse(reason = "missing_doi_or_url")
-                )
-                return@get
-
                 val result = StudyCardService.generate(url)
                 if (result.success) StudyCardPersistence.save(result, doi = null)
                 call.respond(result)
