@@ -3,8 +3,11 @@ package com.cohort.ui.studycard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cohort.data.api.ApiClient
+import com.cohort.data.model.StudyCardJobResponse
 import com.cohort.data.model.StudyCardResponse
 import com.cohort.ui.UiState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +20,12 @@ data class SaveUiState(
 )
 
 class StudyCardViewModel : ViewModel() {
+    private companion object {
+        const val POLL_DELAY_MS = 1_500L
+        const val MAX_POLL_ATTEMPTS = 80
+    }
+
+    private var loadJob: Job? = null
 
     private val _uiState = MutableStateFlow<UiState<StudyCardResponse>>(UiState.Idle)
     val uiState: StateFlow<UiState<StudyCardResponse>> = _uiState.asStateFlow()
@@ -25,37 +34,37 @@ class StudyCardViewModel : ViewModel() {
     val saveUiState: StateFlow<SaveUiState> = _saveUiState.asStateFlow()
 
     fun load(doi: String) {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            _saveUiState.value = _saveUiState.value.copy(isSaving = false, errorMessage = null)
-            _uiState.value = try {
-                val card = ApiClient.api.studyCardByDoi(doi)
-                if (card.success) {
-                    syncSavedState(card.isSaved)
-                    UiState.Success(card)
-                } else if (card.sourceType == "METADATA_ONLY") {
-                    UiState.Success(card)
-                } else {
-                    UiState.Error(card.reason ?: "Failed to generate study card")
-                }
-            } catch (e: Exception) {
-                UiState.Error(e.message ?: "Request failed")
-            }
-        }
+        loadStudyCard(
+            createJob = { ApiClient.api.createStudyCardByDoi(doi) },
+            allowMetadataOnly = true,
+            defaultError = "Failed to generate study card",
+        )
     }
 
     fun loadByUrl(url: String) {
-        viewModelScope.launch {
+        loadStudyCard(
+            createJob = { ApiClient.api.createStudyCardByUrl(url) },
+            allowMetadataOnly = false,
+            defaultError = "Failed to load study card",
+        )
+    }
+
+    private fun loadStudyCard(
+        createJob: suspend () -> StudyCardJobResponse,
+        allowMetadataOnly: Boolean,
+        defaultError: String,
+    ) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = UiState.Loading
             _saveUiState.value = _saveUiState.value.copy(isSaving = false, errorMessage = null)
             _uiState.value = try {
-                val card = ApiClient.api.studyCardByUrl(url)
-                if (card.success) {
-                    syncSavedState(card.isSaved)
-                    UiState.Success(card)
-                } else {
-                    UiState.Error(card.reason ?: "Failed to load study card")
-                }
+                val job = createJob()
+                val card = pollForStudyCard(job.jobId)
+                card.toUiState(
+                    allowMetadataOnly = allowMetadataOnly,
+                    defaultError = defaultError,
+                )
             } catch (e: Exception) {
                 UiState.Error(e.message ?: "Request failed")
             }
@@ -124,9 +133,53 @@ class StudyCardViewModel : ViewModel() {
         }
     }
 
+    private suspend fun pollForStudyCard(jobId: String): StudyCardResponse {
+        repeat(MAX_POLL_ATTEMPTS) { attempt ->
+            val job = ApiClient.api.getStudyCardJob(jobId)
+            when (job.status.lowercase()) {
+                "processing" -> {
+                    if (attempt == MAX_POLL_ATTEMPTS - 1) {
+                        throw IllegalStateException("Study card generation timed out")
+                    }
+                    delay(POLL_DELAY_MS)
+                }
+                "completed" -> {
+                    return job.result ?: throw IllegalStateException("Study card result missing")
+                }
+                "failed" -> {
+                    throw IllegalStateException(job.error ?: "Failed to generate study card")
+                }
+                else -> {
+                    throw IllegalStateException("Unknown study card job status")
+                }
+            }
+        }
+
+        throw IllegalStateException("Study card generation timed out")
+    }
+
+    private fun StudyCardResponse.toUiState(
+        allowMetadataOnly: Boolean,
+        defaultError: String,
+    ): UiState<StudyCardResponse> {
+        return when {
+            success -> {
+                syncSavedState(isSaved)
+                UiState.Success(this)
+            }
+            allowMetadataOnly && sourceType == "METADATA_ONLY" -> UiState.Success(this)
+            else -> UiState.Error(reason ?: defaultError)
+        }
+    }
+
     private fun syncSavedState(isSaved: Boolean) {
         _saveUiState.value = SaveUiState(isSaved = isSaved)
         val currentCard = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentCard.copy(isSaved = isSaved))
+    }
+
+    override fun onCleared() {
+        loadJob?.cancel()
+        super.onCleared()
     }
 }

@@ -41,6 +41,19 @@ data class StudyCardResponse(
 )
 
 @Serializable
+data class StudyCardJobResponse(
+    val jobId: String,
+    val status: String,
+)
+
+@Serializable
+data class StudyCardJobStatusResponse(
+    val status: String,
+    val result: StudyCardResponse? = null,
+    val error: String? = null,
+)
+
+@Serializable
 data class RecentStudyCard(
     val createdAt: String,
     val generationSource: String,

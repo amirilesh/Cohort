@@ -2,10 +2,12 @@ package com.cohort.data.api
 
 import com.cohort.data.model.RecentStudyCard
 import com.cohort.data.model.SearchResult
-import com.cohort.data.model.StudyCardResponse
+import com.cohort.data.model.StudyCardJobResponse
+import com.cohort.data.model.StudyCardJobStatusResponse
 import retrofit2.Response
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -18,15 +20,20 @@ interface CohortApi {
         @Query("perPage") perPage: Int = 10,
     ): SearchResult
 
-    @GET("studycard")
-    suspend fun studyCardByDoi(
+    @POST("studycard")
+    suspend fun createStudyCardByDoi(
         @Query("doi") doi: String,
-    ): StudyCardResponse
+    ): StudyCardJobResponse
 
-    @GET("studycard")
-    suspend fun studyCardByUrl(
+    @POST("studycard")
+    suspend fun createStudyCardByUrl(
         @Query("url") url: String,
-    ): StudyCardResponse
+    ): StudyCardJobResponse
+
+    @GET("studycard/{jobId}")
+    suspend fun getStudyCardJob(
+        @Path("jobId") jobId: String,
+    ): StudyCardJobStatusResponse
 
     @GET("studycards/recent")
     suspend fun getRecentStudyCards(): List<RecentStudyCard>

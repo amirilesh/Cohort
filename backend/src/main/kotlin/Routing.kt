@@ -22,6 +22,12 @@ data class HealthResponse(
     val openAiKey: String,
 )
 
+@Serializable
+data class StudyCardRequest(
+    val doi: String? = null,
+    val url: String? = null,
+)
+
 fun Application.configureRouting() {
     routing {
 
@@ -94,44 +100,45 @@ fun Application.configureRouting() {
         }
 
         rateLimit(StudyCardRateLimit) {
-            get("/studycard") {
-                val doi = call.request.queryParameters["doi"]
-                val url = call.request.queryParameters["url"]
+            post("/studycard") {
+                val queryDoi = call.request.queryParameters["doi"].asPresentValue()
+                val queryUrl = call.request.queryParameters["url"].asPresentValue()
+                val body = if (queryDoi == null && queryUrl == null) {
+                    call.receiveStudyCardRequestOrNull()
+                } else {
+                    null
+                }
+                val bodyDoi = body?.doi.asPresentValue()
+                val bodyUrl = body?.url.asPresentValue()
 
-                if (!doi.isNullOrBlank()) {
-                    if (doi.length > 200) {
-                        call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "doi_too_long"))
-                        return@get
-                    }
-                    val cached = StudyCardPersistence.findByDoi(doi)
-                    if (cached != null) {
-                        call.respond(cached)
-                        return@get
-                    }
-                    val result = StudyCardService.generateFromDoi(doi)
-                    if (result.success) StudyCardPersistence.save(result, doi)
-                    call.respond(result)
-                    return@get
-                }
-
-                if (url.isNullOrBlank()) {
-                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_doi_or_url"))
-                    return@get
-                }
-                if (url.length > 2000) {
-                    call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
-                    return@get
-                }
-
-                val cached = StudyCardPersistence.findByUrl(url)
-                if (cached != null) {
-                    call.respond(cached)
-                    return@get
-                }
-                val result = StudyCardService.generate(url)
-                if (result.success) StudyCardPersistence.save(result, doi = null)
-                call.respond(result)
+                call.enqueueStudyCardJob(
+                    doi = queryDoi ?: bodyDoi,
+                    url = queryUrl ?: bodyUrl,
+                )
             }
+
+            get("/studycard") {
+                call.enqueueStudyCardJob(
+                    doi = call.request.queryParameters["doi"].asPresentValue(),
+                    url = call.request.queryParameters["url"].asPresentValue(),
+                )
+            }
+        }
+
+        get("/studycard/{jobId}") {
+            val jobId = call.parameters["jobId"].asPresentValue()
+            if (jobId == null) {
+                call.respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_job_id"))
+                return@get
+            }
+
+            val job = InMemoryJobStore.getJob(jobId)
+            if (job == null) {
+                call.respond(HttpStatusCode.NotFound, ApiErrorResponse(reason = "job_not_found"))
+                return@get
+            }
+
+            call.respondStudyCardJob(job)
         }
 
         get("/studycards/recent") {
@@ -225,5 +232,60 @@ private fun checkOpenAlex(): String {
         if (response.statusCode() in 200..299) "up" else "down"
     } catch (_: Exception) {
         "down"
+    }
+}
+
+private fun String?.asPresentValue(): String? {
+    return this?.trim()?.takeIf { it.isNotBlank() }
+}
+
+private suspend fun ApplicationCall.receiveStudyCardRequestOrNull(): StudyCardRequest? {
+    return try {
+        receiveNullable<StudyCardRequest>()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private suspend fun ApplicationCall.enqueueStudyCardJob(doi: String?, url: String?) {
+    if (doi != null) {
+        if (doi.length > 200) {
+            respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "doi_too_long"))
+            return
+        }
+
+        respond(HttpStatusCode.Accepted, StudyCardJobService.start(doi = doi, url = null))
+        return
+    }
+
+    if (url == null) {
+        respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "missing_doi_or_url"))
+        return
+    }
+    if (url.length > 2000) {
+        respond(HttpStatusCode.BadRequest, ApiErrorResponse(reason = "url_too_long"))
+        return
+    }
+
+    respond(HttpStatusCode.Accepted, StudyCardJobService.start(doi = null, url = url))
+}
+
+private suspend fun ApplicationCall.respondStudyCardJob(job: AsyncJobResult) {
+    when (job.status) {
+        JobStatus.PROCESSING -> respond(ProcessingJobResult(status = job.status))
+        JobStatus.COMPLETED -> {
+            val result = job.result
+            if (result == null) {
+                respond(FailedJobResult(status = JobStatus.FAILED, error = "study_card_result_missing"))
+            } else {
+                respond(CompletedJobResult(status = job.status, result = result))
+            }
+        }
+        JobStatus.FAILED -> respond(
+            FailedJobResult(
+                status = job.status,
+                error = job.error ?: "study_card_generation_failed",
+            )
+        )
     }
 }
