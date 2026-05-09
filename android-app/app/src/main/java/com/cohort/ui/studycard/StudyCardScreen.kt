@@ -83,6 +83,64 @@ private val CyanDim   = Color(0xFF0E1F25)
 
 private val CardBg = Color(0xFF1A1E2E)
 
+private data class SourceStyle(
+    val accent: Color,
+    val dimBg: Color,
+    val label: String,
+    val helperText: String,
+)
+
+private fun studyCardSourceStyle(sourceType: String, source: String): SourceStyle {
+    val normalizedType = sourceType.uppercase()
+    val normalizedSource = source.lowercase()
+
+    return when {
+        normalizedType == "ABSTRACT_ONLY" || normalizedSource == "llm_abstract" -> SourceStyle(
+            accent = Blue,
+            dimBg = BlueDim,
+            label = "Abstract only",
+            helperText = "Generated from abstract because full text was unavailable.",
+        )
+        normalizedType == "METADATA_ONLY" -> SourceStyle(
+            accent = Orange,
+            dimBg = OrangeDim,
+            label = "Metadata only",
+            helperText = "Generated from metadata because full text/abstract was unavailable.",
+        )
+        else -> SourceStyle(
+            accent = Purple,
+            dimBg = PurpleDim,
+            label = "Full text",
+            helperText = "AI-generated summary of key findings\nand insights from this research.",
+        )
+    }
+}
+
+private fun historySourceStyle(generationSource: String): SourceStyle {
+    return when (generationSource.lowercase()) {
+        "llm_abstract" -> SourceStyle(
+            accent = Blue,
+            dimBg = BlueDim,
+            label = "Abstract only",
+            helperText = "Generated from abstract because full text was unavailable.",
+        )
+        "fallback" -> SourceStyle(
+            accent = Orange,
+            dimBg = OrangeDim,
+            label = "Metadata only",
+            helperText = "Generated from metadata because full text/abstract was unavailable.",
+        )
+        else -> SourceStyle(
+            accent = Purple,
+            dimBg = PurpleDim,
+            label = "Full text",
+            helperText = "AI-generated summary of key findings\nand insights from this research.",
+        )
+    }
+}
+
+private fun SourceStyle.usesFullText(): Boolean = label == "Full text"
+
 // ────────────────────────────────────────────────────────────────────────
 // Study Card Screen (from DOI)
 // ────────────────────────────────────────────────────────────────────────
@@ -256,6 +314,8 @@ private fun StudyCardTopBar(
 
 @Composable
 private fun StudyCardContent(card: StudyCardResponse) {
+    val sourceStyle = studyCardSourceStyle(card.sourceType, card.source)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -264,12 +324,12 @@ private fun StudyCardContent(card: StudyCardResponse) {
         // ── Summarized Study ────────────────────────────────────────────
         item {
             SectionCard(
-                accent = Purple,
-                dimBg = PurpleDim,
+                accent = sourceStyle.accent,
+                dimBg = sourceStyle.dimBg,
                 icon = Icons.Filled.AutoAwesome,
                 title = "Summarized Study",
-                chip = "AI Summary",
-                subtitle = "AI-generated summary of key findings\nand insights from this research.",
+                chip = sourceStyle.label,
+                subtitle = sourceStyle.helperText,
             ) {
                 Text(
                     text = card.tldr,
@@ -382,11 +442,16 @@ private fun StudyCardContent(card: StudyCardResponse) {
 
         // ── Open Full Paper ─────────────────────────────────────────────
         if (card.url.isNotBlank()) {
-            item { OpenPaperCard(url = card.url) }
+            item {
+                OpenPaperCard(
+                    url = card.url,
+                    title = if (sourceStyle.usesFullText()) "Read full paper" else "Open source",
+                )
+            }
         }
 
         // ── Source badge ────────────────────────────────────────────────
-        item { SourceBadge(source = card.source) }
+        item { SourceBadge(style = sourceStyle) }
 
         // Bottom spacing
         item { Spacer(Modifier.height(8.dp)) }
@@ -399,6 +464,8 @@ private fun StudyCardContent(card: StudyCardResponse) {
 
 @Composable
 private fun HistoryDetailContent(card: RecentStudyCard) {
+    val sourceStyle = historySourceStyle(card.generationSource)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -435,12 +502,12 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
         if (card.tldr.isNotBlank()) {
             item {
                 SectionCard(
-                    accent = Purple,
-                    dimBg = PurpleDim,
+                    accent = sourceStyle.accent,
+                    dimBg = sourceStyle.dimBg,
                     icon = Icons.Filled.AutoAwesome,
                     title = "Summarized Study",
-                    chip = "AI Summary",
-                    subtitle = "AI-generated summary from this research.",
+                    chip = sourceStyle.label,
+                    subtitle = sourceStyle.helperText,
                 ) {
                     Text(
                         text = card.tldr,
@@ -473,12 +540,17 @@ private fun HistoryDetailContent(card: RecentStudyCard) {
 
         // Source badge
         if (card.generationSource.isNotBlank()) {
-            item { SourceBadge(source = card.generationSource) }
+            item { SourceBadge(style = sourceStyle) }
         }
 
         // Open paper
         if (card.sourceUrl.isNotBlank()) {
-            item { OpenPaperCard(url = card.sourceUrl) }
+            item {
+                OpenPaperCard(
+                    url = card.sourceUrl,
+                    title = if (sourceStyle.usesFullText()) "Read full paper" else "Open source",
+                )
+            }
         }
 
         // Info notice
@@ -614,7 +686,7 @@ private fun SectionCard(
 // ────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun OpenPaperCard(url: String) {
+private fun OpenPaperCard(url: String, title: String = "Read full paper") {
     val context = LocalContext.current
     Card(
         modifier = Modifier
@@ -651,7 +723,7 @@ private fun OpenPaperCard(url: String) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Read full paper",
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Cyan,
@@ -677,13 +749,7 @@ private fun OpenPaperCard(url: String) {
 // ────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun SourceBadge(source: String) {
-    val isAi = source.lowercase() in listOf("llm", "llm_abstract")
-    val label = when (source.lowercase()) {
-        "llm", "llm_abstract" -> "Generated by Cohort AI"
-        "fallback"            -> "Text extraction"
-        else                  -> source
-    }
+private fun SourceBadge(style: SourceStyle) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -692,8 +758,7 @@ private fun SourceBadge(source: String) {
     ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (isAi) Purple.copy(alpha = 0.1f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
+            color = style.dimBg,
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -701,16 +766,19 @@ private fun SourceBadge(source: String) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = if (isAi) Icons.Filled.AutoAwesome
-                                  else Icons.Filled.Construction,
+                    imageVector = if (style.usesFullText() || style.label == "Abstract only") {
+                        Icons.Filled.AutoAwesome
+                    } else {
+                        Icons.Filled.Construction
+                    },
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
-                    tint = if (isAi) Purple else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = style.accent,
                 )
                 Text(
-                    text = label,
+                    text = style.label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isAi) Purple else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = style.accent,
                 )
             }
         }
@@ -796,7 +864,8 @@ private fun MetadataOnlyContent(card: StudyCardResponse) {
                 dimBg = OrangeDim,
                 icon = Icons.Filled.Info,
                 title = "Limited Information",
-                subtitle = "Full study card could not be generated.\nShowing available metadata only.",
+                chip = "Metadata only",
+                subtitle = "Generated from metadata because full text/abstract was unavailable.",
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // Title
@@ -846,7 +915,7 @@ private fun MetadataOnlyContent(card: StudyCardResponse) {
         // ── Open paper ──────────────────────────────────────────────────
         val paperUrl = card.url.ifBlank { card.doi ?: "" }
         if (paperUrl.isNotBlank()) {
-            item { OpenPaperCard(url = paperUrl) }
+            item { OpenPaperCard(url = paperUrl, title = "Open source") }
         }
 
         item { Spacer(Modifier.height(8.dp)) }
